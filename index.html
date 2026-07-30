@@ -1,683 +1,1970 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Carta Pastorale — Carte mondiale des diocèses</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
-<style>
-  :root{
-    --ink:#1e293b; --muted:#64748b; --line:#e2e8f0; --bg:#f8fafc;
-    --blue:#2563eb; --red:#dc2626; --amber:#f59e0b; --teal:#0d9488; --gray:#9ca3af;
-    --panel-w:400px;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink)}
-  #map{position:absolute;inset:0;background:#dbeafe}
-  .leaflet-container{font:inherit}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Le Bon Alignement — Outil de discernement éthique</title>
+  <meta name="description" content="Un outil gratuit pour évaluer ce qui est en jeu dans tes choix. Discernement éthique par la dérivée et la proportionnalité.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-  /* --- panneau de contrôle --- */
-  #ctrl{position:absolute;top:14px;left:14px;z-index:1000;width:330px;max-width:calc(100vw - 28px);
-    background:rgba(255,255,255,.96);backdrop-filter:blur(6px);border-radius:14px;
-    box-shadow:0 8px 30px rgba(15,23,42,.18);border:1px solid var(--line);overflow:hidden}
-  #ctrl .hd{padding:12px 14px 10px;border-bottom:1px solid var(--line)}
-  #ctrl h1{font-size:16px;font-weight:700;letter-spacing:-.01em}
-  #ctrl h1 span{color:var(--blue)}
-  #ctrl .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
-  #searchbox{position:relative;padding:10px 12px 6px}
-  #q{width:100%;padding:9px 12px 9px 34px;font-size:13.5px;border:1.5px solid var(--line);border-radius:10px;outline:none;background:#fff}
-  #q:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
-  #searchbox svg{position:absolute;left:23px;top:21px;width:15px;height:15px;stroke:var(--muted)}
-  #sugg{position:absolute;left:12px;right:12px;top:48px;background:#fff;border:1px solid var(--line);
-    border-radius:10px;box-shadow:0 10px 26px rgba(15,23,42,.16);max-height:290px;overflow:auto;display:none;z-index:20}
-  #sugg .it{padding:8px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
-  #sugg .it:hover{background:#eff6ff}
-  #sugg .it .pays{color:var(--muted);font-size:11px;white-space:nowrap}
-  #sugg .it .nopos{font-size:10px;color:#b45309}
-  #chips{display:flex;flex-wrap:wrap;gap:5px;padding:8px 12px 12px}
-  .chip{font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--muted)}
-  .chip:hover{border-color:var(--blue);color:var(--blue)}
-  .chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
-  #statsline{padding:7px 14px;font-size:11px;color:var(--muted);border-top:1px solid var(--line);background:var(--bg)}
+    :root {
+      --bg-cream: #FDFCF8;
+      --bg-warm: #F8F6F1;
+      --bg-dark: #2D2D2D;
+      --text-primary: #2D2D2D;
+      --text-secondary: #4A4540;
+      --text-muted: #6B6560;
+      --text-light: #8A8580;
+      --accent: #B5651D;
+      --accent-light: rgba(181, 101, 29, 0.08);
+      --accent-hover: #9A5618;
+      --border: #E0DCD6;
+      --border-light: #F0EDE8;
+      --white: #FFFFFF;
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 20px rgba(0,0,0,0.06);
+      --shadow-lg: 0 8px 40px rgba(0,0,0,0.08);
+      --shadow-accent: 0 8px 25px rgba(181, 101, 29, 0.25);
+      --transition-smooth: all 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    }
 
-  /* --- légende --- */
-  #legend{position:absolute;bottom:18px;left:14px;z-index:1000;background:rgba(255,255,255,.94);
-    border:1px solid var(--line);border-radius:12px;padding:9px 12px;font-size:11px;color:var(--muted);
-    box-shadow:0 4px 16px rgba(15,23,42,.12)}
-  #legend .row{display:flex;align-items:center;gap:7px;margin:3px 0}
-  .dot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:none}
-  .dot.approx{border:2px dashed #fff;box-shadow:0 0 0 1px var(--muted);opacity:.75}
+    html { scroll-behavior: smooth; font-size: 16px; }
 
-  /* --- marqueurs --- */
-  .mk{border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
-  .mk.approx{opacity:.72;border-style:dashed}
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-cream);
+      color: var(--text-primary);
+      line-height: 1.7;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
 
-  /* --- panneau latéral --- */
-  #panel{position:absolute;top:0;right:0;height:100%;width:var(--panel-w);max-width:100vw;z-index:1100;
-    background:#fff;border-left:1px solid var(--line);box-shadow:-10px 0 34px rgba(15,23,42,.16);
-    transform:translateX(105%);transition:transform .28s ease;display:flex;flex-direction:column}
-  #panel.open{transform:translateX(0)}
-  #panel .ph{padding:16px 18px 12px;border-bottom:1px solid var(--line);position:relative;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff}
-  #panel .ph h2{font-size:18px;font-weight:700;letter-spacing:-.01em;padding-right:30px}
-  #panel .ph .meta{font-size:12px;opacity:.9;margin-top:3px}
-  #panel .ph .badge{display:inline-block;font-size:10.5px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);
-    padding:2px 9px;border-radius:999px;margin-top:7px}
-  #close{position:absolute;top:12px;right:12px;width:28px;height:28px;border:none;border-radius:8px;
-    background:rgba(255,255,255,.18);color:#fff;font-size:15px;cursor:pointer;line-height:1}
-  #close:hover{background:rgba(255,255,255,.32)}
-  #pbody{flex:1;overflow-y:auto;padding:14px 16px 26px}
-  .sec{margin-bottom:18px}
-  .sec h3{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:8px;
-    display:flex;align-items:center;gap:6px}
-  .sec h3::after{content:"";flex:1;height:1px;background:var(--line)}
-  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
-  .card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 9px}
-  .card .v{font-size:16px;font-weight:700;letter-spacing:-.02em}
-  .card .l{font-size:10px;color:var(--muted);margin-top:1px}
-  .ind{border-left:3px solid var(--blue);background:var(--bg);border-radius:0 8px 8px 0;padding:8px 10px;margin-bottom:7px}
-  .ind .t{font-size:12.5px;font-weight:600;display:flex;justify-content:space-between;gap:8px}
-  .ind .t .val{color:var(--blue);white-space:nowrap}
-  .ind .ref{font-size:10.5px;color:var(--muted)}
-  .ind .interp{font-size:11.5px;color:#475569;margin-top:3px;line-height:1.45}
-  .pill{display:inline-block;font-size:10.5px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;
-    padding:2px 8px;border-radius:999px;margin:2px 3px 2px 0}
-  .ctx{font-size:12.5px;line-height:1.55;color:#334155;background:var(--bg);border:1px solid var(--line);
-    border-radius:10px;padding:10px 12px}
-  .kv{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 2px;border-bottom:1px dashed var(--line)}
-  .kv:last-child{border-bottom:none}
-  .kv b{font-weight:600}
-  ul.pistes{list-style:none}
-  ul.pistes li{font-size:12.5px;line-height:1.5;padding:7px 10px;background:#f0fdf4;border:1px solid #bbf7d0;
-    border-radius:8px;margin-bottom:6px}
-  ul.quests{list-style:none}
-  ul.quests li{font-size:12.5px;line-height:1.5;padding:7px 10px;background:#eff6ff;border:1px solid #bfdbfe;
-    border-radius:8px;margin-bottom:6px;font-style:italic}
-  .foot{font-size:10.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:9px;margin-top:4px;line-height:1.6}
-  .foot a{color:var(--blue);text-decoration:none}
-  .loading{text-align:center;padding:44px 20px;color:var(--muted);font-size:13px}
-  .spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--blue);border-radius:50%;
-    margin:0 auto 12px;animation:sp 0.9s linear infinite}
-  @keyframes sp{to{transform:rotate(360deg)}}
-  .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:10px;padding:14px;font-size:12.5px;text-align:center}
-  .err button{margin-top:9px;background:var(--blue);color:#fff;border:none;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:12.5px}
-  #toast{position:absolute;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);z-index:1300;
-    background:#1e293b;color:#fff;font-size:12.5px;padding:9px 18px;border-radius:10px;opacity:0;transition:.3s;pointer-events:none}
-  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  #apiStatus{display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:5px;vertical-align:1px}
-  #apiStatus.on{background:#16a34a}
-  @media (max-width:640px){
-    #ctrl{width:calc(100vw - 20px);left:10px;top:10px}
-    #panel{width:100vw}
-    #legend{display:none}
-  }
-  /* --- bouton info (dans le panneau de contrôle) & fenêtre modale --- */
-  #ctrl .hd{position:relative}
-  #infoBtn{position:absolute;top:11px;right:11px;width:24px;height:24px;border-radius:50%;
-    border:1px solid var(--line);background:#fff;font-size:12px;font-weight:700;color:var(--muted);
-    cursor:pointer;font-family:Georgia,serif;line-height:1;padding:0}
-  #infoBtn:hover{color:var(--blue);border-color:var(--blue);background:#eff6ff}
-  #infoOverlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1400;display:none;
-    align-items:center;justify-content:center;padding:18px}
-  #infoOverlay.open{display:flex}
-  #infoModal{background:#fff;border-radius:16px;max-width:660px;width:100%;max-height:85vh;
-    display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(15,23,42,.3);overflow:hidden}
-  #infoModal .im-head{padding:16px 18px 0;border-bottom:1px solid var(--line);position:relative}
-  #infoModal h2{font-size:17px;margin-bottom:10px;letter-spacing:-.01em}
-  #infoModal .im-close{position:absolute;top:12px;right:14px;border:none;background:#f1f5f9;width:30px;height:30px;
-    border-radius:8px;cursor:pointer;font-size:14px;color:var(--muted)}
-  #infoModal .im-close:hover{background:#e2e8f0}
-  #infoTabs{display:flex;gap:2px;flex-wrap:wrap}
-  #infoTabs button{border:none;background:none;padding:8px 10px;font-size:12.5px;color:var(--muted);
-    cursor:pointer;border-bottom:2px solid transparent;font-weight:600;font-family:inherit}
-  #infoTabs button.on{color:var(--blue);border-bottom-color:var(--blue)}
-  #infoBody{padding:16px 20px 22px;overflow-y:auto;font-size:13px;line-height:1.6;color:#334155}
-  #infoBody h4{font-size:12.5px;margin:14px 0 6px;color:var(--ink)}
-  #infoBody ul{margin:6px 0 6px 18px}
-  #infoBody li{margin-bottom:4px}
-  .src-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--bg)}
-  .src-card b{font-size:12.5px}
-  .src-card p{font-size:12px;color:var(--muted);margin:2px 0 4px}
-  .src-card a{color:var(--blue);font-size:12px;text-decoration:none;font-weight:600}
-  .src-card a:hover{text-decoration:underline}
-  .proj-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .proj-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg)}
-  .proj-card b{font-size:12.5px;display:block;margin-bottom:2px}
-  .proj-card p{font-size:11.5px;color:var(--muted);margin-bottom:5px}
-  .proj-card a{font-size:11.5px;color:var(--blue);text-decoration:none;font-weight:600}
-  .proj-card a.soon{color:var(--gray);pointer-events:none}
-  @media(max-width:640px){.proj-grid{grid-template-columns:1fr}}
-</style>
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg-warm); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+    .progress-bar {
+      position: fixed;
+      top: 0; left: 0;
+      height: 3px;
+      background: var(--accent);
+      width: 0%;
+      z-index: 1000;
+      transition: width 0.1s linear;
+    }
+
+    .step-indicator {
+      position: fixed;
+      top: 20px;
+      right: 40px;
+      z-index: 99;
+      background: rgba(253, 252, 248, 0.9);
+      backdrop-filter: blur(10px);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      border: 1px solid var(--border-light);
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+
+    .step-indicator.visible { opacity: 1; }
+
+    .nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      padding: 20px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(253, 252, 248, 0.95);
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow-sm);
+      transition: var(--transition-smooth);
+    }
+
+    .nav-logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.3rem;
+      font-weight: 400;
+      color: var(--text-primary);
+      text-decoration: none;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-size: 0.85rem;
+      font-weight: 400;
+      color: var(--text-muted);
+      text-decoration: none;
+      letter-spacing: 0.02em;
+      transition: color 0.3s;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .nav-links a::after {
+      content: '';
+      position: absolute;
+      bottom: -4px; left: 0;
+      width: 0; height: 1px;
+      background: var(--accent);
+      transition: width 0.3s;
+    }
+
+    .nav-links a:hover { color: var(--accent); }
+    .nav-links a:hover::after { width: 100%; }
+    .nav-links a.active { color: var(--accent); }
+    .nav-links a.active::after { width: 100%; }
+
+    .nav-mobile-toggle {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+    }
+
+    .nav-mobile-toggle span {
+      display: block;
+      width: 24px;
+      height: 2px;
+      background: var(--text-primary);
+      margin: 5px 0;
+      transition: 0.3s;
+    }
+
+    .page { display: none; padding-top: 80px; }
+    .page.active { display: block; }
+
+    .btn-primary {
+      display: inline-block;
+      padding: 16px 48px;
+      background: var(--accent);
+      color: var(--white);
+      border: none;
+      border-radius: 40px;
+      font-family: 'Inter', sans-serif;
+      font-size: 1rem;
+      font-weight: 500;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      position: relative;
+      overflow: hidden;
+      text-decoration: none;
+    }
+
+    .btn-primary::before {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-accent);
+    }
+
+    .btn-primary:hover::before { left: 100%; }
+
+    .btn-secondary {
+      display: inline-block;
+      padding: 12px 32px;
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 40px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 400;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      margin-right: 12px;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-export {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 32px;
+      background: var(--white);
+      color: var(--accent);
+      border: 2px solid var(--accent);
+      border-radius: 40px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+
+    .btn-export:hover {
+      background: var(--accent);
+      color: var(--white);
+      transform: translateY(-2px);
+    }
+
+    .situation-input {
+      width: 100%;
+      min-height: 140px;
+      padding: 24px;
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      font-family: 'Inter', sans-serif;
+      font-size: 1.05rem;
+      line-height: 1.7;
+      color: var(--text-primary);
+      background: var(--white);
+      resize: vertical;
+      transition: var(--transition-smooth);
+      margin: 24px 0;
+    }
+
+    .situation-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(181, 101, 29, 0.1);
+    }
+
+    .situation-input::placeholder {
+      color: #B8B3AD;
+      font-style: italic;
+    }
+
+    .choices-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin: 32px 0;
+    }
+
+    .choice-card {
+      background: var(--white);
+      border: 2px solid var(--border-light);
+      border-radius: 16px;
+      padding: 28px 24px;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      text-align: center;
+    }
+
+    .choice-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .choice-card.selected {
+      border-color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    .choice-card h4 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+    }
+
+    .choice-card p {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .quote-block {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(1.3rem, 3vw, 1.6rem);
+      font-style: italic;
+      font-weight: 400;
+      color: var(--accent);
+      text-align: center;
+      padding: 36px 28px;
+      margin: 36px 0;
+      border-left: 3px solid var(--accent);
+      border-right: 3px solid var(--accent);
+      background: var(--accent-light);
+      line-height: 1.6;
+    }
+
+    .notification {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--bg-dark);
+      color: var(--bg-cream);
+      padding: 14px 28px;
+      border-radius: 30px;
+      font-size: 0.9rem;
+      z-index: 1000;
+      opacity: 0;
+      transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .notification.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* ===== ACCUEIL ===== */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 120px 40px 80px;
+      background: linear-gradient(180deg, var(--bg-cream) 0%, var(--bg-warm) 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%; right: -30%;
+      width: 80%; height: 150%;
+      background: radial-gradient(ellipse, rgba(181, 101, 29, 0.03) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      padding: 8px 20px;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      border-radius: 30px;
+      margin-bottom: 32px;
+    }
+
+    .hero h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      font-weight: 300;
+      line-height: 1.1;
+      margin-bottom: 24px;
+      letter-spacing: -0.02em;
+    }
+
+    .hero-subtitle {
+      font-size: clamp(1rem, 2.5vw, 1.25rem);
+      font-weight: 300;
+      color: var(--text-muted);
+      max-width: 520px;
+      line-height: 1.7;
+      margin-bottom: 20px;
+    }
+
+    .hero-privacy {
+      font-size: 0.85rem;
+      color: var(--text-light);
+      max-width: 480px;
+      line-height: 1.7;
+    }
+
+    .hero-privacy strong {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .scroll-hint {
+      margin-top: 60px;
+      animation: bounce 2s infinite;
+    }
+
+    .scroll-hint-text {
+      font-size: 0.8rem;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .scroll-hint-arrow {
+      font-size: 1.5rem;
+      color: var(--accent);
+      margin-top: 8px;
+    }
+
+    .features-section, .how-section {
+      padding: 80px 40px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .how-section { background: var(--bg-warm); }
+
+    .features-section h2, .how-section h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 400;
+      text-align: center;
+      margin-bottom: 16px;
+      color: var(--text-primary);
+    }
+
+    .features-section .subtitle {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      margin-bottom: 60px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+
+    .feature-card {
+      background: var(--white);
+      border: 1px solid var(--border-light);
+      border-radius: 16px;
+      padding: 36px 28px;
+      transition: var(--transition-smooth);
+      text-align: center;
+    }
+
+    .feature-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-3px);
+    }
+
+    .feature-icon { font-size: 2.5rem; margin-bottom: 16px; }
+    .feature-card h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.4rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+    }
+    .feature-card p {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+      margin: 0;
+    }
+
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 32px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .step-card { text-align: center; }
+    .step-card .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: var(--white);
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-accent);
+    }
+    .step-card h4 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.2rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+    .step-card p {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .cta-section {
+      background: var(--bg-dark);
+      color: var(--bg-cream);
+      text-align: center;
+      padding: 80px 40px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-section::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: radial-gradient(ellipse at center, rgba(181, 101, 29, 0.08) 0%, transparent 70%);
+    }
+
+    .cta-section h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 400;
+      color: var(--bg-cream);
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .cta-section p {
+      font-size: 1.1rem;
+      line-height: 1.8;
+      color: #C4BEB7;
+      max-width: 500px;
+      margin: 0 auto 32px;
+      position: relative;
+    }
+
+    .cta-section .btn-primary {
+      background: var(--accent);
+      color: var(--white);
+      position: relative;
+    }
+
+    /* ===== QUI SUIS-JE ===== */
+    .page-about .hero {
+      min-height: 50vh;
+      padding: 140px 40px 60px;
+    }
+
+    .about-section {
+      padding: 60px 40px;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .about-section:nth-child(even) { background: var(--bg-warm); }
+
+    .about-section h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+      font-weight: 400;
+      margin-bottom: 20px;
+    }
+
+    .about-section p {
+      font-size: 1.02rem;
+      line-height: 1.85;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+
+    .timeline {
+      position: relative;
+      padding-left: 32px;
+      margin: 40px 0;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 8px; top: 8px; bottom: 8px;
+      width: 2px;
+      background: var(--border);
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 32px;
+      padding-left: 24px;
+    }
+
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -28px; top: 6px;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 3px solid var(--bg-cream);
+      box-shadow: 0 0 0 2px var(--accent);
+    }
+
+    .timeline-item h4 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.2rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+
+    .timeline-item .timeline-date {
+      font-size: 0.8rem;
+      color: var(--accent);
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .timeline-item p {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      margin: 0;
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      margin: 32px 0;
+    }
+
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      padding: 28px;
+      transition: var(--transition-smooth);
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-3px);
+    }
+
+    .card h4 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.2rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+    }
+
+    .card p {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+      margin: 0;
+    }
+
+    .highlight-box {
+      background: var(--white);
+      border: 2px solid var(--accent);
+      border-radius: 16px;
+      padding: 36px;
+      margin: 40px 0;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .highlight-box::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: var(--accent);
+    }
+
+    .highlight-box h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.4rem;
+      font-weight: 500;
+      color: var(--accent);
+      margin: 0 0 12px;
+    }
+
+    .highlight-box p {
+      font-size: 1.05rem;
+      color: var(--text-secondary);
+      margin: 0;
+      line-height: 1.7;
+    }
+
+    .info-box {
+      background: var(--white);
+      border-left: 4px solid var(--accent);
+      border-radius: 0 12px 12px 0;
+      padding: 24px 28px;
+      margin: 24px 0;
+    }
+
+    .info-box p { margin: 0; font-size: 0.95rem; }
+    .info-box p + p { margin-top: 8px; }
+
+    /* ===== OUTIL ===== */
+    .step-section {
+      padding: 120px 40px 100px;
+      max-width: 720px;
+      margin: 0 auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .step-section:nth-child(even) { background: var(--bg-warm); }
+
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: var(--white);
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 28px;
+      box-shadow: var(--shadow-accent);
+    }
+
+    .step-section h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 400;
+      line-height: 1.2;
+      margin-bottom: 20px;
+      color: var(--text-primary);
+    }
+
+    .step-section h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(1.2rem, 3vw, 1.5rem);
+      font-weight: 400;
+      font-style: italic;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .step-section p {
+      font-size: 1.05rem;
+      line-height: 1.85;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+
+    .step-section p strong { font-weight: 500; color: var(--text-primary); }
+
+    .transition-section {
+      background: var(--bg-dark);
+      color: var(--bg-cream);
+      text-align: center;
+      padding: 120px 40px;
+      min-height: 60vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .transition-section::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: radial-gradient(ellipse at center, rgba(181, 101, 29, 0.08) 0%, transparent 70%);
+    }
+
+    .transition-section h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 400;
+      color: var(--bg-cream);
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .transition-section p {
+      font-size: 1.15rem;
+      line-height: 1.9;
+      color: #C4BEB7;
+      max-width: 500px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .transition-section p strong {
+      color: var(--bg-cream);
+      font-weight: 500;
+    }
+
+    .svg-container {
+      max-width: 480px;
+      margin: 40px auto;
+    }
+    .svg-container svg { width: 100%; height: auto; }
+
+    .svg-path {
+      stroke-dasharray: 1000;
+      stroke-dashoffset: 1000;
+      transition: stroke-dashoffset 2.5s ease-out;
+    }
+    .svg-path.animated { stroke-dashoffset: 0; }
+
+    .synthesis-box {
+      background: var(--white);
+      border: 2px solid var(--accent);
+      border-radius: 20px;
+      padding: 40px;
+      margin: 40px 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .synthesis-box::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: var(--accent);
+    }
+
+    .synthesis-box h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem;
+      font-weight: 500;
+      color: var(--accent);
+      margin: 0 0 24px;
+    }
+
+    .synthesis-content {
+      font-size: 1rem;
+      line-height: 1.8;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      font-family: 'Inter', monospace;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 32px;
+    }
+
+    /* ===== FOOTER ===== */
+    .footer {
+      text-align: center;
+      padding: 60px 40px 40px;
+      background: var(--bg-warm);
+      border-top: 1px solid var(--border-light);
+    }
+
+    .footer-quote {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.15rem;
+      font-style: italic;
+      color: var(--text-muted);
+      max-width: 600px;
+      margin: 0 auto 32px;
+      line-height: 1.6;
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .footer-links a {
+      font-size: 0.85rem;
+      color: var(--text-light);
+      text-decoration: none;
+      transition: color 0.3s;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .footer-links a::after {
+      content: '';
+      position: absolute;
+      bottom: -2px; left: 0;
+      width: 0; height: 1px;
+      background: var(--accent);
+      transition: width 0.3s;
+    }
+
+    .footer-links a:hover { color: var(--accent); }
+    .footer-links a:hover::after { width: 100%; }
+
+    .footer-copyright {
+      font-size: 0.8rem;
+      color: var(--text-light);
+    }
+
+    /* --- Le mot du Chemin (Jn 14, 6) sous le titre --- */
+    .hero-verse {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin: 2px 0 22px;
+    }
+    .hero-verse span {
+      font-family: 'Inter', sans-serif;
+      font-style: normal;
+      font-size: 0.72rem;
+      color: var(--text-light);
+      letter-spacing: 0.08em;
+    }
+
+    /* --- Porte vers le foyer frère (fin de synthèse) --- */
+    .door-card {
+      max-width: 620px;
+      margin: 56px auto 0;
+      padding: 36px 32px;
+      background: var(--bg-warm);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      text-align: center;
+    }
+    .door-card .door-verse {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 0.98rem;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+    .door-card h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem;
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+    .door-card p {
+      font-size: 0.92rem;
+      color: var(--text-secondary);
+      margin-bottom: 22px;
+    }
+
+    /* --- Constellation des projets frères (pied de page) --- */
+    .footer-family {
+      margin-top: 36px;
+      padding-top: 28px;
+      border-top: 1px solid var(--border);
+    }
+    .family-verse {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 1.02rem;
+      color: var(--text-muted);
+      max-width: 560px;
+      margin: 0 auto 16px;
+      line-height: 1.6;
+    }
+    .family-links {
+      display: flex;
+      justify-content: center;
+      gap: 10px 22px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .family-links a {
+      font-size: 0.85rem;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.3s;
+    }
+    .family-links a:hover { color: var(--accent-hover); text-decoration: underline; }
+    .family-note {
+      font-size: 0.78rem;
+      color: var(--text-light);
+    }
+
+    @keyframes bounce {
+      0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-12px); }
+      60% { transform: translateY(-6px); }
+    }
+
+    @media (max-width: 768px) {
+      .nav { padding: 16px 24px; }
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: 100%; left: 0; right: 0;
+        background: rgba(253, 252, 248, 0.98);
+        backdrop-filter: blur(10px);
+        flex-direction: column;
+        padding: 20px 24px;
+        gap: 16px;
+        box-shadow: var(--shadow-md);
+      }
+      .nav-links.active { display: flex; }
+      .nav-mobile-toggle { display: block; }
+      .hero { padding: 100px 24px 60px; }
+      .features-section, .how-section { padding: 60px 24px; }
+      .cta-section { padding: 60px 24px; }
+      .step-section { padding: 100px 24px 80px; min-height: auto; }
+      .transition-section { padding: 80px 24px; min-height: 50vh; }
+      .quote-block { padding: 28px 20px; }
+      .synthesis-box { padding: 28px 20px; }
+      .choices-grid { grid-template-columns: 1fr; }
+      .action-buttons { flex-direction: column; align-items: center; }
+      .btn-secondary { margin-right: 0; margin-bottom: 12px; }
+      .step-indicator { right: 20px; top: 16px; }
+      .about-section { padding: 40px 24px; }
+      .footer { padding: 40px 24px 30px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+      html { scroll-behavior: auto; }
+    }
+
+    a:focus-visible, button:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+  </style>
 </head>
 <body>
-<div id="map"></div>
 
-<div id="ctrl">
-  <div class="hd">
-    <h1>Carta <span>Pastorale</span> 🗺️</h1>
-    <div class="sub">Carte mondiale des diocèses — rapports pastoraux en direct de l'API</div>
-    <button id="infoBtn" title="À propos, sources, confidentialité" onclick="openInfo('apropos')">i</button>
-  </div>
-  <div id="searchbox">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-    <input id="q" type="text" placeholder="Rechercher votre diocèse… (ex : Lyon, Kinshasa, Boston)" autocomplete="off">
-    <div id="sugg"></div>
-  </div>
-  <div id="chips"></div>
-  <div id="statsline"><span id="apiStatus"></span><span id="statsTxt">Chargement…</span></div>
-</div>
+  <div class="progress-bar" id="progressBar" aria-hidden="true"></div>
+  <div class="step-indicator" id="stepIndicator">Étape 1 / 5</div>
+  <div class="notification" id="notification"></div>
 
-<div id="legend">
-  <div class="row"><span class="dot" style="background:#dc2626"></span>Archidiocèse métropolitain</div>
-  <div class="row"><span class="dot" style="background:#f59e0b"></span>Archidiocèse</div>
-  <div class="row"><span class="dot" style="background:#2563eb"></span>Diocèse</div>
-  <div class="row"><span class="dot" style="background:#0d9488"></span>Autre juridiction</div>
-  <div class="row"><span class="dot approx" style="background:#2563eb"></span>Position approximative</div>
-</div>
+  <nav class="nav" role="navigation" aria-label="Navigation principale">
+    <span class="nav-logo" onclick="showPage('accueil')">🧭 Le Bon Alignement</span>
+    <button class="nav-mobile-toggle" id="navToggle" aria-label="Ouvrir le menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-links" id="navLinks">
+      <li><a onclick="showPage('accueil')" class="active" data-page="accueil">Accueil</a></li>
+      <li><a onclick="showPage('apropos')" data-page="apropos">Qui suis-je ?</a></li>
+      <li><a onclick="showPage('sources')" data-page="sources">Sources</a></li>
+      <li><a onclick="showPage('outil')" data-page="outil">L'outil</a></li>
+      <li><a onclick="showPage('confidentialite')" data-page="confidentialite">Confidentialité</a></li>
+      <li><a onclick="showPage('mentions')" data-page="mentions">Mentions légales</a></li>
+    </ul>
+  </nav>
 
-<aside id="panel">
-  <div class="ph">
-    <button id="close" title="Fermer">✕</button>
-    <h2 id="pTitle">…</h2>
-    <div class="meta" id="pMeta"></div>
-    <span class="badge" id="pBadge"></span>
-  </div>
-  <div id="pbody"></div>
-</aside>
-
-<div id="infoOverlay" onclick="if(event.target===this)closeInfo()">
-  <div id="infoModal">
-    <div class="im-head">
-      <button class="im-close" onclick="closeInfo()" title="Fermer">✕</button>
-      <h2>Carta Pastorale 🗺️</h2>
-      <div id="infoTabs">
-        <button data-t="apropos" class="on" onclick="switchInfoTab('apropos')">À propos</button>
-        <button data-t="sources" onclick="switchInfoTab('sources')">Sources</button>
-        <button data-t="conf" onclick="switchInfoTab('conf')">Confidentialité</button>
-        <button data-t="projets" onclick="switchInfoTab('projets')">Autres projets</button>
+  <!-- ============================================================ -->
+  <!-- PAGE ACCUEIL -->
+  <!-- ============================================================ -->
+  <div class="page active" id="page-accueil">
+    <header class="hero">
+      <div class="hero-badge">Gratuit · 100% confidentiel · Sans inscription</div>
+      <h1>Le Bon Alignement</h1>
+      <p class="hero-subtitle">Un outil pour évaluer ce qui est en jeu dans tes choix — et retrouver la clarté.</p>
+      <p class="hero-verse">« Je suis le Chemin, la Vérité et la Vie » <span>— Jn 14, 6</span></p>
+      <p class="hero-privacy"><strong>Tes données restent sur ton appareil.</strong><br>Personne n'y a accès. Ce que tu écris ici ne quitte jamais ton navigateur.</p>
+      <button class="btn-primary" onclick="showPage('outil')">Commencer le discernement →</button>
+      <div class="scroll-hint">
+        <div class="scroll-hint-text">Découvrir</div>
+        <div class="scroll-hint-arrow">↓</div>
       </div>
-    </div>
-    <div id="infoBody">
+    </header>
 
-      <div class="info-tab" id="info-apropos">
-        <p>Carte mondiale des <b>3 220 circonscriptions ecclésiales catholiques</b> (diocèses, archidiocèses, missions, prélatures…). Cliquez sur un point pour obtenir son <b>rapport pastoral complet</b>, généré en direct par l'API Carta Pastorale : statistiques, évolution, indicateurs, contexte du pays, pistes de discernement.</p>
-        <h4>Cet outil EST</h4>
-        <ul>
-          <li>Une carte de référence des circonscriptions ecclésiales</li>
-          <li>Un support pédagogique pour la formation et le discernement pastoral</li>
-          <li>Basé sur des données publiques et vérifiables (voir onglet Sources)</li>
-          <li>Un projet personnel sans affiliation institutionnelle</li>
-        </ul>
-        <h4>Cet outil N'EST PAS</h4>
-        <ul>
-          <li>Un document officiel du Saint-Siège ni une source juridique canonique</li>
-          <li>Une géolocalisation précise : 250 positions sont <b>approximatives</b> (marqueurs en pointillés, centrées sur le pays)</li>
-          <li>Nécessairement exhaustif : certaines missions récentes peuvent manquer</li>
-        </ul>
-      </div>
-
-      <div class="info-tab" id="info-sources" style="display:none">
-        <div class="src-card"><b>GCatholic.org</b>
-          <p>Source principale : base de données mondiale des structures ecclésiales (catholiques, prêtres, paroisses, historique).</p>
-          <a href="https://gcatholic.org" target="_blank" rel="noopener">gcatholic.org ↗</a></div>
-        <div class="src-card"><b>API Carta Pastorale</b>
-          <p>Rapports pastoraux servis en direct : indicateurs, évolutions, contexte pays (IDH, PIB, liberté religieuse).</p>
-          <a href="https://carta-pastorale.onrender.com" target="_blank" rel="noopener">carta-pastorale.onrender.com ↗</a></div>
-        <div class="src-card"><b>Catholic-Hierarchy.org</b>
-          <p>Répertoire indépendant des diocèses et évêques, maintenu par David M. Cheney.</p>
-          <a href="https://www.catholic-hierarchy.org" target="_blank" rel="noopener">catholic-hierarchy.org ↗</a></div>
-        <div class="src-card"><b>Annuario Pontificio &amp; Annus Statisticus Ecclesiae</b>
-          <p>Annuaire officiel du Saint-Siège et recueil statistique annuel (Librairie Éditrice Vaticane).</p></div>
-        <div class="src-card"><b>OpenStreetMap &amp; Leaflet</b>
-          <p>Fond de carte libre © contributeurs OpenStreetMap (ODbL) · moteur de carte open-source Leaflet.</p>
-          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">openstreetmap.org/copyright ↗</a> &nbsp;
-          <a href="https://leafletjs.com" target="_blank" rel="noopener">leafletjs.com ↗</a></div>
-      </div>
-
-      <div class="info-tab" id="info-conf" style="display:none">
-        <ul>
-          <li><b>Aucun cookie</b>, aucun traceur, aucun compte utilisateur.</li>
-          <li><b>Aucune donnée personnelle</b> n'est collectée, stockée ou revendue — rien n'est enregistré sur votre appareil.</li>
-          <li>La <b>recherche</b> s'effectue localement, dans votre navigateur.</li>
-          <li>Le clic sur une fiche interroge l'API (carta-pastorale.onrender.com) : comme pour toute visite web, ce serveur peut journaliser une adresse IP technique, sans profilage.</li>
-          <li>Votre <b>position géographique n'est jamais demandée</b>.</li>
-          <li>Le <b>code source est lisible</b> : clic droit → « Afficher le code source de la page ».</li>
-        </ul>
-      </div>
-
-      <div class="info-tab" id="info-projets" style="display:none">
-        <p style="margin-bottom:10px">Outils complémentaires pour l'étude et la pastorale :</p>
-        <div class="proj-grid">
-          <div class="proj-card"><b>📖 Lexique Canonique</b>
-            <p>Dictionnaire interactif des termes du droit canonique (CIC 1983).</p>
-            <a href="#" class="soon">Lien à venir</a></div>
-          <div class="proj-card"><b>👥 Annuaire des Conférences</b>
-            <p>Registre des épiscopats nationaux avec contacts et statistiques.</p>
-            <a href="#" class="soon">Lien à venir</a></div>
-          <div class="proj-card"><b>📊 Statistiques Ecclesia</b>
-            <p>Visualisation des données statistiques de l'Église dans le monde.</p>
-            <a href="#" class="soon">Lien à venir</a></div>
-          <div class="proj-card"><b>📅 Calendrier Liturgique</b>
-            <p>Calendrier perpétuel : lectures, solennités et fêtes mobiles.</p>
-            <a href="#" class="soon">Lien à venir</a></div>
+    <section class="features-section">
+      <h2>Pourquoi cet outil ?</h2>
+      <p class="subtitle">Trois engagements qui fondent cette démarche</p>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🔒</div>
+          <h3>Confidentialité totale</h3>
+          <p>Tes réponses sont stockées uniquement dans ton navigateur. Aucun serveur, aucune base de données, aucun traçage.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🆓</div>
+          <h3>100% gratuit</h3>
+          <p>Le discernement éthique ne devrait pas être un luxe. Poser les bonnes questions est un droit, pas un service payant.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🧭</div>
+          <h3>Ton autonomie</h3>
+          <p>Ce n'est pas un enseignement doctrinal. C'est un outil pour que chacun puisse discerner par lui-même.</p>
         </div>
       </div>
+    </section>
 
+    <section class="how-section">
+      <h2>Comment ça marche ?</h2>
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <h4>Décris ta situation</h4>
+          <p>Parle librement de ce qui te préoccupe, comme tu le ferais à toi-même.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <h4>Lis ta tendance</h4>
+          <p>La dérivée te révèle la direction où tu vas, ici et maintenant.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <h4>Vérifie l'alignement</h4>
+          <p>La proportionnalité te montre si ton action est cohérente avec ton horizon.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <h4>Formule un pas modeste</h4>
+          <p>Un geste simple, fidèle à toi-même, est déjà une grande œuvre.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">5</div>
+          <h4>Garde ta synthèse</h4>
+          <p>Copie ou télécharge ton discernement. Il reste sur ton appareil.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-section">
+      <h2>Prêt à regarder de plus près ?</h2>
+      <p>Ce qui est en jeu dans tes choix mérite d'être nommé.<br>Prends le temps. Personne ne te regarde.</p>
+      <button class="btn-primary" onclick="showPage('outil')">Commencer le discernement →</button>
+    </section>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- PAGE QUI SUIS-JE -->
+  <!-- ============================================================ -->
+  <div class="page page-about" id="page-apropos">
+    <header class="hero">
+      <div class="hero-badge">Qui suis-je ?</div>
+      <h1>Derrière l'outil,<br>une vie de discernement</h1>
+      <p>Prêtre catholique, formé en éthique publique. Voici pourquoi cette démarche existe.</p>
+    </header>
+
+    <div class="about-section">
+      <h2>Mon parcours</h2>
+      <p>Je ne suis pas arrivé ici par hasard. Ce qui m'a mené à créer <strong>Le Bon Alignement</strong>, c'est la rencontre de trois chemins : la foi, les mathématiques, et l'éthique en situation.</p>
+
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-date">Formation initiale</div>
+          <h4>Passion pour les mathématiques</h4>
+          <p>Pendant ma jeunesse, j'aimais les mathématiques. Cette rigueur du raisonnement, cette capacité à modéliser le réel, ne m'a jamais quitté. Je crois que les mathématiques ne sont pas qu'un outil de calcul : elles sont un <strong>mode de regard</strong> sur le monde.</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-date">Vocation</div>
+          <h4>Prêtrise catholique</h4>
+          <p>L'appel au sacerdoce m'a plongé au cœur des vies humaines dans leur complexité. Dans le secret de la confession, dans l'accompagnement spirituel, j'ai découvert que les gens ne manquent pas de bonne volonté. Ils manquent de <strong>mots pour nommer ce qu'ils vivent</strong>.</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-date">Spécialisation</div>
+          <h4>Éthique publique</h4>
+          <p>J'ai poursuivi une formation en éthique publique pour comprendre comment les décisions morales se prennent dans la complexité sociale, politique, institutionnelle. L'éthique n'est pas une abstraction : elle se vit <strong>en situation</strong>, avec ses tensions, ses urgences, ses ambiguïtés.</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-date">2026</div>
+          <h4>Naissance du Bon Alignement</h4>
+          <p>Je me suis rendu compte que ce dont les gens ont besoin, c'est d'un espace où l'on peut <strong>formuler</strong> ce qui est en jeu — sans jugement, sans doctrine imposée, sans thérapie. Un espace où la rigueur intellectuelle rencontre l'écoute du cœur.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <h2>La méthode : deux outils mathématiques</h2>
+      <p>Je ne crois pas aux réponses toutes faites. Je crois aux <strong>bonnes questions</strong>. Pour aider à les poser, je m'appuie sur deux concepts mathématiques transposés au vécu moral :</p>
+
+      <div class="quote-block">
+        La dérivée pour observer la tendance.<br>La proportionnalité pour évaluer l'action.
+      </div>
+
+      <p>Ce ne sont pas des calculs. Ce sont des <strong>modes de regard</strong> — des façons de structurer l'attention pour voir clair dans le chaos d'une situation éthique.</p>
+
+      <div class="cards-grid">
+        <div class="card">
+          <h4>La dérivée</h4>
+          <p>"Où t'inclines-tu en ce moment ?" Observer la tendance réelle de sa vie, pas l'idéal qu'on se raconte.</p>
+        </div>
+        <div class="card">
+          <h4>La proportionnalité</h4>
+          <p>"Ton action est-elle proportionnée à ton horizon ?" Vérifier que ce qu'on fait tient debout face à ce qu'on veut devenir.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <h2>Ce qui me guide</h2>
+      <p>Trois engagements fondent cette démarche :</p>
+      <div class="cards-grid">
+        <div class="card">
+          <h4>La gratuité</h4>
+          <p>Le discernement éthique ne devrait pas être un luxe. Poser les bonnes questions est un droit, pas un service payant.</p>
+        </div>
+        <div class="card">
+          <h4>La confidentialité totale</h4>
+          <p>Tes données ne quittent jamais ton appareil. Je n'y ai pas accès. Personne n'y a accès.</p>
+        </div>
+        <div class="card">
+          <h4>L'autonomie</h4>
+          <p>Ce n'est pas un enseignement doctrinal. C'est un outil pour que chacun puisse discerner par lui-même.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <h2>Ce que je ne suis pas</h2>
+      <p>Pour éviter toute confusion, il est important de dire clairement ce que <strong>Le Bon Alignement n'est pas</strong> :</p>
+      <div class="cards-grid">
+        <div class="card">
+          <h4>Pas une thérapie</h4>
+          <p>Je n'ai pas de formation médicale ou psychothérapeutique. Je n'essaie pas de soigner. J'essaie d'aider à voir clair.</p>
+        </div>
+        <div class="card">
+          <h4>Pas un conseil juridique</h4>
+          <p>Je ne donne pas de conseils juridiques, financiers, ou professionnels. Je t'aide à nommer les enjeux éthiques.</p>
+        </div>
+        <div class="card">
+          <h4>Pas une doctrine imposée</h4>
+          <p>Je ne te dis pas quoi faire. L'outil t'aide à formuler ce que tu vis pour que ton choix te ressemble.</p>
+        </div>
+      </div>
+    </div>
+
+    <section class="cta-section">
+      <h2>Prêt à commencer le discernement ?</h2>
+      <p>Tes réponses restent sur ton appareil. Personne n'y a accès. Pas même moi.</p>
+      <button class="btn-primary" onclick="showPage('outil')">Commencer</button>
+    </section>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- PAGE SOURCES & MÉTHODE -->
+  <!-- ============================================================ -->
+  <div class="page" id="page-sources">
+    <header class="hero">
+      <div class="hero-badge">Sources &amp; méthode</div>
+      <h1>Sur quoi repose<br>cet outil ?</h1>
+      <p>Deux traditions se rencontrent ici : le discernement spirituel et la rigueur mathématique. En voici les racines, en toute transparence.</p>
+    </header>
+
+    <div class="about-section">
+      <h2>La tradition du discernement</h2>
+      <p>Discerner, c'est apprendre à lire ce qui se passe en soi pour choisir dans la direction du plus grand bien. Cette pratique a une longue histoire :</p>
+      <div class="cards-grid">
+        <div class="card"><h4>Saint Ignace de Loyola</h4><p>Les <em>Exercices spirituels</em> (XVI<sup>e</sup> siècle) et leurs règles de « discernement des esprits » : observer ce qui porte vers la vie, et ce qui en détourne.</p></div>
+        <div class="card"><h4>L'exigence biblique</h4><p>« Éprouvez tout et retenez ce qui est bon » (1 Th 5, 21) : le discernement est une exigence de la foi avant d'être une technique.</p></div>
+        <div class="card"><h4>L'éthique en situation</h4><p>La philosophie morale (proportionnalité, vertus, biens en jeu) fournit des grilles pour peser une action concrète, avec ses tensions et ses ambiguïtés.</p></div>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <h2>Les deux outils mathématiques</h2>
+      <p>Deux concepts simples, transposés en « modes de regard » — sans aucun calcul :</p>
+      <div class="cards-grid">
+        <div class="card"><h4>La dérivée</h4><p>En mathématiques, elle mesure la tendance instantanée d'une courbe. Ici : « où t'inclines-tu, maintenant ? » — une lecture de la pente, pas un jugement.</p></div>
+        <div class="card"><h4>La proportionnalité</h4><p>Le théorème de Thalès : le petit triangle est à l'image du grand. Ici : « ton geste d'aujourd'hui est-il à la mesure de ton horizon ? »</p></div>
+      </div>
+      <p style="margin-top:18px;">Ces outils ne décident jamais à ta place. Ils structurent l'attention pour que tu voies clair — le choix reste tien, devant Dieu et ta conscience.</p>
+    </div>
+
+    <div class="about-section">
+      <h2>L'ancrage spirituel</h2>
+      <div class="highlight-box">
+        <p style="font-family:'Cormorant Garamond',serif; font-style:italic; font-size:1.35rem; margin:0;">« Je suis le Chemin, la Vérité et la Vie »</p>
+        <p style="margin-top:10px; color:var(--text-muted); margin-bottom:0;">— Évangile selon Jean 14, 6</p>
+      </div>
+      <p>Cet outil porte le mot <strong>Chemin</strong> : il t'aide à regarder où tu vas. Il a des frères qui portent les autres mots — tu les trouveras au pied de chaque page.</p>
+    </div>
+
+    <div class="about-section">
+      <h2>Gratuité &amp; confidentialité</h2>
+      <p>Ces deux engagements ne sont pas des options techniques, mais des choix éthiques — ils sont détaillés dans la page <a onclick="showPage('confidentialite')" style="color:var(--accent); cursor:pointer; font-weight:500;">Confidentialité</a>.</p>
+    </div>
+
+    <section class="cta-section">
+      <h2>Prêt à regarder ton chemin ?</h2>
+      <p>Prends le temps. Personne ne te regarde.</p>
+      <button class="btn-primary" onclick="showPage('outil')">Commencer le discernement</button>
+    </section>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- PAGE OUTIL -->
+  <!-- ============================================================ -->
+  <div class="page" id="page-outil">
+    <section class="step-section" id="etape1" data-step="1">
+      <div class="step-number">1</div>
+      <h2>Quelle situation traverses-tu ?</h2>
+      <p>Décris ce qui te préoccupe. Pas besoin de bien formuler — parle comme tu parlerais à toi-même.</p>
+
+      <textarea class="situation-input" id="situationInput" placeholder="Je ne sais pas si je dois...&#10;Ça fait des mois que je me demande...&#10;J'ai fait un choix et je ne sais pas s'il était le bon..."></textarea>
+
+      <div class="choices-grid" id="situationTypes" style="display:none;">
+        <div class="choice-card" data-type="choix"><h4>Un choix à faire</h4><p>Je dois décider entre plusieurs possibilités</p></div>
+        <div class="choice-card" data-type="choix-fait"><h4>Un choix déjà fait</h4><p>J'ai décidé mais je doute</p></div>
+        <div class="choice-card" data-type="habitude"><h4>Une habitude</h4><p>Je répète quelque chose qui me pose question</p></div>
+        <div class="choice-card" data-type="relation"><h4>Une relation</h4><p>Une tension avec quelqu'un</p></div>
+      </div>
+
+      <div id="situationAnalysis" style="margin-top:20px;"></div>
+
+      <div style="margin-top:32px;">
+        <button class="btn-primary" id="btnNext1">Continuer →</button>
+      </div>
+    </section>
+
+    <section class="step-section" id="etape2" data-step="2">
+      <div class="step-number">2</div>
+      <h3>Premier outil : la dérivée</h3>
+      <h2>Où t'inclines-tu en ce moment ?</h2>
+      <p>La dérivée mesure la <strong>tendance instantanée</strong> — la direction où tu vas, ici et maintenant. Pas une condamnation, juste une lecture.</p>
+
+      <div class="quote-block">
+        La pente te dit où tu vas.<br>L'horizon te dit où tu veux aller.<br>La sagesse est de lire l'une à la lumière de l'autre.
+      </div>
+
+      <p>Qu'est-ce qui caractérise le plus ta tendance actuelle ?</p>
+
+      <div class="choices-grid">
+        <div class="choice-card" data-derive="evitement"><h4>J'évite</h4><p>Je repousse, je fuis, je ne veux pas voir</p></div>
+        <div class="choice-card" data-derive="precipitation"><h4>Je précipite</h4><p>Je cours, je veux en finir, je ne réfléchis pas</p></div>
+        <div class="choice-card" data-derive="immobilite"><h4>Je suis bloqué</h4><p>Je ne bouge pas, paralysé par l'indécision</p></div>
+        <div class="choice-card" data-derive="engagement"><h4>Je m'engage</h4><p>J'avance mais je ne sais pas si c'est juste</p></div>
+      </div>
+
+      <div id="deriveAnalysis" style="margin-top:20px;"></div>
+
+      <div style="margin-top:32px;">
+        <button class="btn-secondary" id="btnBack2">← Retour</button>
+        <button class="btn-primary" id="btnNext2">Continuer →</button>
+      </div>
+    </section>
+
+    <section class="transition-section" id="transition">
+      <h2>Le moment de vérité</h2>
+      <p>Tu sais maintenant où tu vas.<br><br>Mais est-ce que ce que tu fais aujourd'hui<br><strong>tient debout</strong> face à ce que tu veux devenir ?</p>
+    </section>
+
+    <section class="step-section" id="etape3" data-step="3">
+      <div class="step-number">3</div>
+      <h3>Deuxième outil : la proportionnalité</h3>
+      <h2>Ton action est-elle proportionnée à ton horizon ?</h2>
+      <p>Le théorème de Thalès nous dit : dans un triangle, une droite parallèle divise les côtés en segments <strong>proportionnels</strong>. Ton action (le petit triangle) est le reflet proportionnel de ta vision (le grand triangle).</p>
+
+      <div class="svg-container">
+        <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="50,250 350,250 200,50" fill="none" stroke="#E0DCD6" stroke-width="2"/>
+          <line x1="125" y1="175" x2="275" y2="175" stroke="#B5651D" stroke-width="3" class="svg-path" id="thalesLine"/>
+          <circle cx="50" cy="250" r="4" fill="#B5651D"/>
+          <circle cx="350" cy="250" r="4" fill="#B5651D"/>
+          <circle cx="200" cy="50" r="4" fill="#B5651D"/>
+          <circle cx="125" cy="175" r="4" fill="#2D2D2D"/>
+          <circle cx="275" cy="175" r="4" fill="#2D2D2D"/>
+          <text x="30" y="270" font-family="Inter" font-size="12" fill="#6B6560">Qui je suis</text>
+          <text x="320" y="270" font-family="Inter" font-size="12" fill="#6B6560">Qui je veux être</text>
+          <text x="180" y="35" font-family="Inter" font-size="12" fill="#6B6560">Mon horizon</text>
+          <text x="120" y="200" font-family="Inter" font-size="12" fill="#B5651D" font-weight="500">Mon action</text>
+          <text x="260" y="200" font-family="Inter" font-size="12" fill="#B5651D" font-weight="500">actuelle</text>
+        </svg>
+      </div>
+
+      <div class="quote-block">
+        Ne cherche pas à embrasser le monde d'un seul geste.<br>Cherche plutôt à maintenir, dans ton geste le plus modeste,<br>le même rapport de présence que si tu embrassais le monde.
+      </div>
+
+      <p>Comment qualifierais-tu l'alignement entre ton action et ton horizon ?</p>
+
+      <div class="choices-grid">
+        <div class="choice-card" data-proportion="aligne"><h4>Ça tient debout</h4><p>Mon action est cohérente avec mes valeurs profondes</p></div>
+        <div class="choice-card" data-proportion="derape"><h4>Ça dérape</h4><p>Je m'éloigne de ce qui compte vraiment pour moi</p></div>
+        <div class="choice-card" data-proportion="contradiction"><h4>Contradiction</h4><p>Je dis une chose et j'en fais une autre</p></div>
+        <div class="choice-card" data-proportion="incertain"><h4>Je ne sais pas</h4><p>Je n'arrive pas à voir clair</p></div>
+      </div>
+
+      <div id="proportionAnalysis" style="margin-top:20px;"></div>
+
+      <div style="margin-top:32px;">
+        <button class="btn-secondary" id="btnBack3">← Retour</button>
+        <button class="btn-primary" id="btnNext3">Continuer →</button>
+      </div>
+    </section>
+
+    <section class="step-section" id="etape4" data-step="4">
+      <div class="step-number">4</div>
+      <h2>Quelle action modeste pourrais-tu envisager ?</h2>
+      <p>On ne change pas tout d'un coup. Mais un <strong>geste modeste, fidèle à soi-même</strong>, est déjà une grande œuvre.</p>
+
+      <textarea class="situation-input" id="actionInput" placeholder="Ce que je pourrais faire demain, même petit...&#10;Un pas, aussi modeste soit-il, dans la direction de mes valeurs..."></textarea>
+
+      <div style="margin-top:32px;">
+        <button class="btn-secondary" id="btnBack4">← Retour</button>
+        <button class="btn-primary" id="btnNext4">Voir ma synthèse →</button>
+      </div>
+    </section>
+
+    <section class="step-section" id="etape5" data-step="5">
+      <div class="step-number">5</div>
+      <h2>Ton discernement</h2>
+      <p>Voici ce que tu as formulé. Relis-le. C'est toi qui as posé ces mots.</p>
+
+      <div class="synthesis-box">
+        <h3>Mon constat personnel</h3>
+        <div class="synthesis-content" id="synthesisContent"></div>
+      </div>
+
+      <div class="action-buttons">
+        <button class="btn-export" id="btnCopy"><span>📋</span> Copier le texte</button>
+        <button class="btn-export" id="btnPDF"><span>📄</span> Télécharger PDF</button>
+        <button class="btn-export" id="btnRestart"><span>↺</span> Recommencer</button>
+      </div>
+
+      <div style="margin-top:40px; text-align:center;">
+        <p style="font-size:0.9rem; color:var(--text-light);">Ce document reste sur ton appareil.<br>Tu peux le sauvegarder, l'imprimer, ou le supprimer quand tu veux.</p>
+      </div>
+
+      <div class="door-card">
+        <p class="door-verse">« Justice et paix s'embrassent » — Psaume 85, 11</p>
+        <h3>Après le discernement, un espace de prière</h3>
+        <p>Si ce qui est remonté mérite d'être déposé dans le silence, le foyer frère t'accueille : textes à méditer, prières, exercices ignatiens, écoute.</p>
+        <button class="btn-primary" onclick="window.open('https://amour-et-verite-app.netlify.app/','_blank','noopener')">🏠 Au Foyer de l'Amour →</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- PAGE CONFIDENTIALITÉ -->
+  <!-- ============================================================ -->
+  <div class="page page-confidentialite" id="page-confidentialite">
+    <header class="hero">
+      <div class="hero-badge">Confidentialité</div>
+      <h1>Ta parole ne quitte<br>jamais ton appareil</h1>
+      <p>Personne n'a accès à ce que tu écris ici. Pas même moi. Voici comment cela fonctionne.</p>
+    </header>
+
+    <div class="about-section">
+      <div class="highlight-box">
+        <h3>Tes données restent sur ton appareil</h3>
+        <p style="margin-top:8px;">Ce que tu écris sur Le Bon Alignement est stocké uniquement dans la mémoire de ton navigateur (<strong>localStorage</strong>). Il ne part jamais sur Internet. Personne ne peut y accéder. Pas même l'auteur de ce site.</p>
+      </div>
+      <p>Ce choix technique est aussi un <strong>choix éthique</strong>. Le discernement est intime. Il ne devrait pas transiter par des serveurs, des bases de données, ou des analyses de comportement.</p>
+    </div>
+
+    <div class="about-section">
+      <h2>Comment cela fonctionne concrètement</h2>
+      <div class="cards-grid">
+        <div class="card"><h4>Pas de serveur</h4><p>Ce site est constitué uniquement de fichiers statiques. Aucun serveur ne traite tes données.</p></div>
+        <div class="card"><h4>Pas de cookies</h4><p>Aucun cookie de suivi, aucun tracker. Rien ne te suit.</p></div>
+        <div class="card"><h4>Pas de base de données</h4><p>Aucune base de données ne conserve tes informations.</p></div>
+        <div class="card"><h4>Tu contrôles tout</h4><p>Tu peux effacer tes données à tout moment en cliquant sur "Recommencer".</p></div>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <h2>Hébergement</h2>
+      <p>Ce site est hébergé sur <strong>Netlify</strong>, une plateforme d'hébergement statique. Aucune donnée utilisateur n'est transmise à Netlify.</p>
+    </div>
+
+    <div class="about-section">
+      <h2>Tes droits</h2>
+      <ul>
+        <li><strong>Droit d'accès</strong> : tes données sont sur ton appareil.</li>
+        <li><strong>Droit de rectification</strong> : tu peux modifier tes réponses directement.</li>
+        <li><strong>Droit à l'effacement</strong> : clique sur "Recommencer".</li>
+        <li><strong>Droit à la portabilité</strong> : copie ou télécharge ta synthèse.</li>
+      </ul>
+    </div>
+
+    <div class="about-section" id="contact">
+      <h2>À propos de ce site</h2>
+      <p>Ce site est une démarche personnelle et gratuite d'accompagnement au discernement éthique. Il n'y a pas de formulaire de contact ni d'adresse courriel associée.</p>
+      <p>Vos réponses restent sur votre appareil. Personne n'y a accès.</p>
     </div>
   </div>
-</div>
 
-<div id="toast"></div>
+  <!-- ============================================================ -->
+  <!-- PAGE MENTIONS LÉGALES -->
+  <!-- ============================================================ -->
+  <div class="page page-mentions" id="page-mentions">
+    <header class="hero">
+      <div class="hero-badge">Mentions légales</div>
+      <h1>Transparence et rigueur</h1>
+      <p>Les informations légales requises pour l'exercice de cette démarche en ligne.</p>
+    </header>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-<script src="data.js"></script>
-<script>
-/* ============ Carta Pastorale — carte v6 connectée à l'API ============ */
-const API = 'https://carta-pastorale.onrender.com';
-const API_KEY = ''; // ← collez votre clé API ici si un jour l'API la demande (envoyée en en-tête X-API-Key)
-const API_HEADERS = API_KEY ? {'X-API-Key': API_KEY} : {};
+    <div class="about-section">
+      <h2>Éditeur du site</h2>
+      <div class="info-box">
+        <p><strong>Qualité :</strong> Prêtre catholique</p>
+        <p><strong>Formation :</strong> Éthique publique</p>
+      </div>
+      <p>Le Bon Alignement est une démarche personnelle et gratuite d'accompagnement au discernement éthique. Elle n'est rattachée à aucune institution, association, ou structure commerciale.</p>
+    </div>
 
-/* --- index des données embarquées --- */
-const ALL = DIOCESES.map(r => ({id:r[0], nom:r[1], pays:r[2], cont:r[3], cat:r[4],
-                                cath:r[5], pct:r[6], lat:r[7], lng:r[8], exact:r[9]===1}));
-const BY_ID = Object.fromEntries(ALL.map(d => [d.id, d]));
-const norm = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
-const fmt = n => (n==null ? '—' : n.toLocaleString('fr-FR'));
-const compact = n => n==null ? '—' : (Math.abs(n)>=1e6 ? (n/1e6).toFixed(2).replace('.',',')+' M'
-                                      : n.toLocaleString('fr-FR'));
-const esc = s => String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const md = s => esc(s).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    <div class="about-section">
+      <h2>Hébergement</h2>
+      <div class="info-box">
+        <p><strong>Hébergeur :</strong> Netlify, Inc.</p>
+        <p><strong>Adresse :</strong> 2325 3rd Street, Suite 215, San Francisco, CA 94107, États-Unis</p>
+      </div>
+    </div>
 
-const CAT_COLOR = c => ({
-  'archidiocèse métropolitain':'#dc2626',
-  'archidiocèse':'#f59e0b',
-  'diocèse':'#2563eb',
-  'administration apostolique':'#0d9488',
-  'autre':'#0d9488'
-}[c] || '#9ca3af');
+    <div class="about-section">
+      <h2>Propriété intellectuelle</h2>
+      <p>L'ensemble du contenu de ce site (textes, design, code, structure) est la propriété de l'éditeur.</p>
+      <p><strong>Polices utilisées :</strong> Cormorant Garamond et Inter (Open Font License)</p>
+      <p><strong>Bibliothèque JavaScript :</strong> jsPDF (Licence MIT)</p>
+    </div>
 
-/* --- carte --- */
-const map = L.map('map', {worldCopyJump:true, minZoom:2, zoomControl:false}).setView([22, 8], 2.4);
-L.control.zoom({position:'bottomright'}).addTo(map);
-const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom:18, zIndex:2, attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · données : API Carta Pastorale (GCatholic)'
-}).addTo(map);
+    <div class="about-section">
+      <h2>Conditions d'utilisation</h2>
+      <p>Le Bon Alignement propose un <strong>outil gratuit et autonome d'accompagnement au discernement éthique</strong>. Ce n'est pas :</p>
+      <ul>
+        <li>Une thérapie ou un suivi psychologique</li>
+        <li>Un conseil juridique, financier, ou professionnel</li>
+        <li>Un enseignement doctrinal ou catéchétique</li>
+        <li>Un service d'urgence ou de secours</li>
+      </ul>
+      <p>Si vous êtes en situation de détresse psychologique grave, contactez :</p>
+      <div class="info-box">
+        <p><strong>SOS Suicide :</strong> 3114 (24h/24)</p>
+        <p><strong>SAMU :</strong> 15</p>
+        <p><strong>Police :</strong> 17</p>
+      </div>
+    </div>
 
-/* --- fond autonome sous OSM + bascule hors ligne si OSM ne répond pas --- */
-let osmOk = false;
-osm.on('tileload', () => { osmOk = true; });
-addAutonomousGrid();
-setTimeout(() => {
-  if (!osmOk) {
-    map.removeLayer(osm);
-    addContinents();
-    L.control.attribution({prefix:false}).addAttribution('données : API Carta Pastorale (GCatholic)').addTo(map);
-    toast('Fond de carte hors ligne activé');
-  }
-}, 8000);
+    <div class="about-section">
+      <h2>Modifications</h2>
+      <p>L'éditeur se réserve le droit de modifier à tout moment les présentes mentions légales.</p>
+      <p><strong>Dernière mise à jour :</strong> 21 juillet 2026</p>
+    </div>
 
-function addAutonomousGrid(){
-  L.GridLayer.AutonomousMap = L.GridLayer.extend({
-    createTile: function(coords){
-      const tile = document.createElement('canvas');
-      const ts = this.getTileSize();
-      tile.setAttribute('width', ts.x); tile.setAttribute('height', ts.y);
-      const ctx = tile.getContext('2d');
-      ctx.fillStyle = '#c5e3ec'; ctx.fillRect(0, 0, ts.x, ts.y);
-      const s = ts.x, n = Math.pow(2, coords.z);
-      const nwLng = coords.x / n * 360 - 180;
-      const nwLatR = Math.atan(Math.sinh(Math.PI * (1 - 2 * coords.y / n)));
-      const seLatR = Math.atan(Math.sinh(Math.PI * (1 - 2 * (coords.y + 1) / n)));
-      const per = 360 / n;
-      const merc = la => Math.log(Math.tan(la / 2 + Math.PI / 4));
-      const latY = la => ((merc(la * Math.PI / 180) - merc(nwLatR)) / (merc(seLatR) - merc(nwLatR))) * s;
-      const lngX = ln => ((ln - nwLng) / per) * s;
-      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 0.8;
-      for (let ln = Math.ceil(nwLng / 10) * 10; ln < nwLng + per; ln += 10) {
-        const px = lngX(ln); ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, s); ctx.stroke();
-      }
-      const nwLat = nwLatR * 180 / Math.PI, seLat = seLatR * 180 / Math.PI;
-      for (let la = Math.ceil(nwLat / 10) * 10; la > seLat - 5; la -= 10) {
-        const py = latY(la);
-        if (py >= -10 && py <= s + 10) { ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(s, py); ctx.stroke(); }
-      }
-      return tile;
-    }
-  });
-  const g = new L.GridLayer.AutonomousMap({zIndex: 1});
-  g.addTo(map);
-}
+    <div class="about-section" id="contact-legal">
+      <h2>Contact</h2>
+      <p>Ce site n'a pas de formulaire de contact, ni d'adresse courriel publique, car il ne collecte aucune donnée et ne propose pas de service commercial.</p>
+      <p>Si vous avez une question concernant la démarche, vous pouvez consulter la page <a onclick="showPage('apropos')" style="color:var(--accent);cursor:pointer;">"Qui suis-je ?"</a>.</p>
+    </div>
+  </div>
 
-function addContinents(){
-  const CONT = [
-    [[75,-170],[75,-50],[60,-50],[60,-80],[50,-60],[45,-55],[40,-70],[35,-75],[25,-80],[20,-105],[15,-90],[10,-85],[5,-78],[8,-60],[15,-60],[25,-80],[30,-115],[35,-120],[40,-125],[45,-125],[50,-130],[55,-135],[60,-140],[65,-165],[70,-170],[75,-170]],
-    [[15,-60],[5,-50],[0,-50],[-5,-35],[-10,-35],[-15,-40],[-20,-40],[-25,-45],[-30,-50],[-35,-55],[-40,-65],[-45,-65],[-50,-75],[-55,-70],[-55,-65],[-50,-70],[-45,-75],[-40,-73],[-35,-72],[-30,-71],[-25,-70],[-20,-70],[-15,-75],[-10,-78],[-5,-80],[0,-80],[5,-78],[10,-75],[12,-77],[12,-72],[10,-60],[15,-60]],
-    [[70,-25],[70,30],[65,30],[65,40],[60,45],[55,50],[50,40],[45,40],[40,30],[35,25],[35,15],[40,10],[45,0],[50,-10],[55,-10],[60,0],[65,10],[70,-10],[70,-25]],
-    [[35,-10],[40,10],[35,25],[30,30],[25,35],[20,35],[15,15],[10,15],[5,10],[0,10],[-5,12],[-10,15],[-15,12],[-20,17],[-25,15],[-30,17],[-35,20],[-30,30],[-25,32],[-20,35],[-15,35],[-10,40],[-5,40],[0,45],[5,45],[10,50],[15,50],[20,45],[25,40],[30,35],[35,30],[35,-10]],
-    [[75,30],[75,60],[70,60],[70,100],[65,100],[65,120],[60,120],[60,140],[55,140],[55,160],[50,160],[50,140],[45,140],[45,130],[40,130],[40,120],[35,120],[35,110],[30,110],[30,100],[25,100],[25,90],[20,90],[20,80],[15,80],[10,80],[10,75],[8,78],[8,92],[10,100],[15,105],[20,110],[25,115],[30,120],[35,125],[40,130],[45,135],[50,140],[55,145],[60,150],[65,170],[70,180],[75,180],[75,30]],
-    [[-10,115],[-15,115],[-20,115],[-25,115],[-30,115],[-35,115],[-40,115],[-40,140],[-35,145],[-30,150],[-25,150],[-20,148],[-15,145],[-10,140],[-10,115]],
-    [[85,-75],[85,-10],[80,-10],[80,-20],[75,-20],[75,-30],[70,-30],[70,-40],[65,-40],[65,-50],[70,-50],[70,-60],[75,-60],[75,-70],[80,-70],[80,-75],[85,-75]],
-    [[60,-11],[58,-4],[55,-6],[52,-5],[50,-5],[50,-10],[52,-10],[55,-8],[58,-11],[60,-11]],
-    [[46,140],[44,143],[40,140],[35,136],[33,130],[35,129],[38,140],[42,141],[46,140]],
-    [[-34,172],[-37,175],[-42,174],[-47,166],[-47,168],[-42,172],[-37,177],[-34,172]],
-    [[-12,43],[-16,44],[-20,44],[-25,47],[-26,44],[-24,43],[-20,43],[-16,43],[-12,43]],
-    [[5,95],[5,140],[0,140],[0,130],[-5,130],[-5,140],[-10,140],[-10,150],[-5,150],[0,150],[5,150],[5,95]],
-    [[20,120],[18,122],[15,121],[12,125],[10,120],[12,118],[15,120],[18,119],[20,120]]
-  ];
-  CONT.forEach(poly => L.polygon(poly, {color:'#8fbfa0', weight:1, fillColor:'#b8d4c2', fillOpacity:0.6, interactive:false}).addTo(map));
-}
+  <!-- ============================================================ -->
+  <!-- FOOTER -->
+  <!-- ============================================================ -->
+  <footer class="footer" id="footer">
+    <p class="footer-quote">"Les mathématiques révèlent ce qui est. Les enjeux éthiques éclairent ce qui compte. L'action permet la renaissance."</p>
+    <nav class="footer-links" aria-label="Liens du pied de page">
+      <a onclick="showPage('accueil')">Accueil</a>
+      <a onclick="showPage('apropos')">Qui suis-je ?</a>
+      <a onclick="showPage('sources')">Sources</a>
+      <a onclick="showPage('outil')">L'outil</a>
+      <a onclick="showPage('confidentialite')">Confidentialité</a>
+      <a onclick="showPage('mentions')">Mentions légales</a>
+    </nav>
+    <div class="footer-family">
+      <p class="family-verse">« L'amour et la vérité se rencontrent, la justice et la paix s'embrassent. » — Psaume 85, 11</p>
+      <div class="family-links">
+        <a href="https://amour-et-verite-app.netlify.app/" target="_blank" rel="noopener">🏠 Au Foyer de l'Amour</a>
+        <a href="https://justice-ai-anonyme-2.onrender.com/" target="_blank" rel="noopener">⚖️ Justice AI</a>
+        <a href="https://bridge-your-project.lovable.app/" target="_blank" rel="noopener">🌉 ONBRIDGE AI</a>
+        <a href="https://cartepastorale-v5.onrender.com/" target="_blank" rel="noopener">🗺️ Carta Pastorale</a>
+      </div>
+      <p class="family-note">Des outils frères pour la justice, la paix et le discernement.</p>
+    </div>
+    <p class="footer-copyright">© 2026 Le Bon Alignement — Discernement éthique gratuit</p>
+  </footer>
 
-const cluster = L.markerClusterGroup({
-  chunkedLoading:true, chunkInterval:60, chunkDelay:20,
-  disableClusteringAtZoom:9, spiderfyOnMaxZoom:true, maxClusterRadius:46
-});
-map.addLayer(cluster);
-const MARKERS = {};
+  <script>
+    function showPage(pageName) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      const target = document.getElementById('page-' + pageName);
+      if (target) target.classList.add('active');
 
-function iconFor(d){
-  const c = CAT_COLOR(d.cat);
-  const s = d.exact ? 13 : 11;
-  return L.divIcon({className:'', iconSize:[s,s], iconAnchor:[s/2,s/2],
-    html:`<div class="mk ${d.exact?'':'approx'}" style="width:${s}px;height:${s}px;background:${c}"></div>`});
-}
-function renderMarkers(cont){
-  cluster.clearLayers();
-  for(const k in MARKERS) delete MARKERS[k];
-  const batch = [];
-  for(const d of ALL){
-    if(d.lat==null) continue;
-    if(cont && d.cont!==cont) continue;
-    const m = L.marker([d.lat, d.lng], {icon:iconFor(d), title:d.nom});
-    m.bindTooltip(`<b>${esc(d.nom)}</b> — ${esc(d.pays)}${d.exact?'':'<br><i style="color:#b45309">position approximative</i>'}`,
-                  {direction:'top', offset:[0,-6]});
-    m.on('click', () => openPanel(d.id));
-    MARKERS[d.id] = m;
-    batch.push(m);
-  }
-  cluster.addLayers(batch);
-  updateStats(cont);
-}
-function updateStats(cont){
-  const shown = Object.keys(MARKERS).length;
-  const exact = ALL.filter(d=>d.exact).length;
-  document.getElementById('statsTxt').textContent =
-    `${shown.toLocaleString('fr-FR')} diocèses affichés · ${exact.toLocaleString('fr-FR')} positions exactes / ${ALL.length.toLocaleString('fr-FR')}`;
-}
-
-/* --- filtres continent --- */
-const CONTS = ['Tous','Afrique','Amérique du Nord','Amérique latine','Asie','Europe','Océanie','Autre'];
-let curCont = '';
-const chipsEl = document.getElementById('chips');
-for(const c of CONTS){
-  const b = document.createElement('button');
-  b.className = 'chip' + (c==='Tous' ? ' on' : '');
-  b.textContent = c;
-  b.onclick = () => {
-    curCont = (c==='Tous') ? '' : c;
-    chipsEl.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on');
-    renderMarkers(curCont);
-  };
-  chipsEl.appendChild(b);
-}
-
-/* --- recherche --- */
-const q = document.getElementById('q'), sugg = document.getElementById('sugg');
-q.addEventListener('input', () => {
-  const v = norm(q.value.trim());
-  if(v.length < 2){ sugg.style.display='none'; return; }
-  const hits = ALL.filter(d => norm(d.nom).includes(v) || norm(d.pays).includes(v)).slice(0, 8);
-  if(!hits.length){ sugg.style.display='none'; return; }
-  sugg.innerHTML = hits.map(d =>
-    `<div class="it" data-id="${d.id}"><span>${esc(d.nom)}${d.lat==null?' <span class="nopos">· sans position</span>':''}</span><span class="pays">${esc(d.pays)}</span></div>`).join('');
-  sugg.style.display = 'block';
-  sugg.querySelectorAll('.it').forEach(el => el.onclick = () => {
-    sugg.style.display='none'; q.value = BY_ID[el.dataset.id].nom; selectDiocese(el.dataset.id);
-  });
-});
-q.addEventListener('keydown', e => {
-  if(e.key === 'Enter'){
-    const v = norm(q.value.trim());
-    const hit = ALL.find(d => norm(d.nom) === v) || ALL.find(d => norm(d.nom).includes(v));
-    if(hit){ sugg.style.display='none'; selectDiocese(hit.id); }
-  }
-  if(e.key === 'Escape') sugg.style.display='none';
-});
-document.addEventListener('click', e => { if(!sugg.contains(e.target) && e.target!==q) sugg.style.display='none'; });
-
-function selectDiocese(id){
-  const d = BY_ID[id];
-  if(!d) return;
-  try{ history.replaceState(null, '', '#d=' + id); }catch(e){}
-  if(d.lat != null){
-    map.flyTo([d.lat, d.lng], 8, {duration:1.1});
-    setTimeout(() => { const m = MARKERS[id]; if(m) cluster.zoomToShowLayer(m, () => m.openTooltip()); }, 1200);
-  } else {
-    toast(`« ${d.nom} » : position non disponible — rapport affiché`);
-  }
-  openPanel(id);
-}
-function toast(msg){
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 3200);
-}
-
-/* --- panneau latéral --- */
-const panel = document.getElementById('panel'), pbody = document.getElementById('pbody');
-document.getElementById('close').onclick = () => panel.classList.remove('open');
-document.addEventListener('keydown', e => { if(e.key==='Escape') panel.classList.remove('open'); });
-
-let fetchTimer = null;
-function openPanel(id){
-  const d = BY_ID[id];
-  panel.classList.add('open');
-  document.getElementById('pTitle').textContent = d.nom;
-  document.getElementById('pMeta').textContent = `${d.pays} · ${d.cont}`;
-  document.getElementById('pBadge').textContent = d.cat;
-  pbody.innerHTML = `<div class="loading"><div class="spin"></div>
-    Chargement du rapport pastoral…<br>
-    <span style="font-size:11px" id="wake">(le serveur peut mettre ~1 min à se réveiller — <span id="elapsed">0</span> s)</span></div>`;
-  let sec = 0;
-  clearInterval(fetchTimer);
-  fetchTimer = setInterval(() => { const e=document.getElementById('elapsed'); if(e) e.textContent = ++sec; }, 1000);
-  fetchDetail(id, d, 0);
-}
-async function fetchDetail(id, d, attempt){
-  const ctrl = new AbortController();
-  const to = setTimeout(() => ctrl.abort(), 85000);
-  try{
-    const r = await fetch(`${API}/dioceses/${encodeURIComponent(id)}`, {signal: ctrl.signal, headers: API_HEADERS});
-    clearTimeout(to);
-    if(!r.ok) throw new Error('HTTP ' + r.status);
-    const j = await r.json();
-    clearInterval(fetchTimer);
-    setApiStatus(true);
-    renderDetail(j, d);
-  }catch(err){
-    clearTimeout(to);
-    if(attempt < 1){ fetchDetail(id, d, attempt+1); return; }
-    clearInterval(fetchTimer);
-    pbody.innerHTML = `<div class="err">⚠️ Impossible de joindre l'API pour le moment.<br>
-      <span style="font-size:11px">${esc(String(err))}</span><br>
-      <button onclick="openPanel('${id}')">Réessayer</button></div>
-      ${summaryFallback(d)}`;
-  }
-}
-function setApiStatus(on){
-  const el = document.getElementById('apiStatus');
-  if(el) el.className = on ? 'on' : '';
-  if(el) el.id = 'apiStatus';
-}
-
-function summaryFallback(d){
-  return `<div class="sec" style="margin-top:14px"><h3>Données hors ligne</h3>
-    <div class="cards">
-      <div class="card"><div class="v">${compact(d.cath)}</div><div class="l">Catholiques</div></div>
-      <div class="card"><div class="v">${d.pct!=null?d.pct+' %':'—'}</div><div class="l">% catholiques</div></div>
-      <div class="card"><div class="v">${esc(d.cat)}</div><div class="l">Catégorie</div></div>
-    </div></div>`;
-}
-
-function card(v, l){ return `<div class="card"><div class="v">${v}</div><div class="l">${l}</div></div>`; }
-
-function renderDetail(j, d){
-  document.getElementById('pTitle').textContent = j.nom || d.nom;
-  document.getElementById('pMeta').textContent = `${j.pays_nom || d.pays} · ${j.continent || d.cont}`;
-  document.getElementById('pBadge').textContent = (j.categorie || d.cat) + (j.annee_donnees ? ` · données ${j.annee_donnees}` : '');
-
-  let h = '';
-
-  /* territoire & ressources */
-  const t = j.territoire || {}, r = j.ressources || {};
-  const cards = [];
-  if(t.catholiques!=null)        cards.push(card(compact(t.catholiques),'Catholiques'));
-  if(t.pourcentage_catholiques!=null) cards.push(card(t.pourcentage_catholiques+' %','% catholiques'));
-  if(t.population_totale!=null)  cards.push(card(compact(t.population_totale),'Population'));
-  if(t.superficie_km2!=null)     cards.push(card(compact(t.superficie_km2)+' km²','Superficie'));
-  if(r.total_pretres!=null)      cards.push(card(fmt(r.total_pretres),'Prêtres'));
-  if(r.paroisses!=null)          cards.push(card(fmt(r.paroisses),'Paroisses'));
-  if(r.pretres_diocesains!=null) cards.push(card(fmt(r.pretres_diocesains),'Prêtres diocésains'));
-  if(r.pretres_religieux!=null)  cards.push(card(fmt(r.pretres_religieux),'Prêtres religieux'));
-  if(r.religieuses!=null)        cards.push(card(fmt(r.religieuses),'Religieuses'));
-  if(r.diacres_permanents!=null) cards.push(card(fmt(r.diacres_permanents),'Diacres perm.'));
-  if(cards.length) h += `<div class="sec"><h3>Chiffres clés</h3><div class="cards">${cards.join('')}</div></div>`;
-
-  /* évolution */
-  if(Array.isArray(j.tendances) && j.tendances.length >= 2)
-    h += `<div class="sec"><h3>Évolution (indice base 100)</h3>${drawTrend(j.tendances)}</div>`;
-
-  /* indicateurs */
-  if(Array.isArray(j.indicateurs) && j.indicateurs.length){
-    h += `<div class="sec"><h3>Indicateurs pastoraux</h3>` + j.indicateurs.map(i =>
-      `<div class="ind"><div class="t"><span>${esc(i.nom)}</span><span class="val">${fmt(i.valeur)} ${esc(i.unite||'')}</span></div>
-       <div class="ref">réf. monde : ${fmt(i.ref_monde)} ${esc(i.unite||'')}</div>
-       <div class="interp">${esc(i.interpretation)}</div></div>`).join('') + `</div>`;
-  }
-
-  /* contexte pays */
-  const ctx = [];
-  if(j.idh!=null){
-    const c = j.idh>=0.8?'#16a34a':j.idh>=0.7?'#65a30d':j.idh>=0.55?'#d97706':'#dc2626';
-    ctx.push(`<div class="kv"><span>Indice de développement humain</span><b style="color:${c}">${j.idh}</b></div>`);
-  }
-  if(j.pib_par_habitant!=null) ctx.push(`<div class="kv"><span>PIB par habitant</span><b>${fmt(j.pib_par_habitant)} $</b></div>`);
-  if(j.taux_urbanisation!=null) ctx.push(`<div class="kv"><span>Taux d'urbanisation</span><b>${j.taux_urbanisation} %</b></div>`);
-  if(j.indice_liberte_religion!=null) ctx.push(`<div class="kv"><span>Liberté religieuse</span><b>${esc(j.indice_liberte_religion)}</b></div>`);
-  if(j.score_persecution!=null){
-    const s = j.score_persecution;
-    const c = s===0?'#16a34a':s<=25?'#65a30d':s<=50?'#d97706':'#dc2626';
-    ctx.push(`<div class="kv"><span>Score de persécution</span><b style="color:${c}">${s}/100</b></div>`);
-  }
-  if(ctx.length || j.contexte_liberte || (j.defis_liberte||[]).length){
-    h += `<div class="sec"><h3>Contexte du pays</h3>`;
-    if(ctx.length) h += ctx.join('');
-    if(j.contexte_liberte) h += `<div class="ctx" style="margin-top:8px">${esc(j.contexte_liberte)}</div>`;
-    if((j.defis_liberte||[]).length)
-      h += `<div style="margin-top:8px">${j.defis_liberte.map(x=>`<span class="pill">${esc(x)}</span>`).join('')}</div>`;
-    h += `</div>`;
-  }
-
-  /* pistes & questions */
-  if((j.pistes||[]).length)
-    h += `<div class="sec"><h3>Pistes pastorales</h3><ul class="pistes">${j.pistes.map(p=>`<li>${md(p)}</li>`).join('')}</ul></div>`;
-  if((j.questions||[]).length)
-    h += `<div class="sec"><h3>Questions de discernement</h3><ul class="quests">${j.questions.map(p=>`<li>❝ ${md(p)} ❞</li>`).join('')}</ul></div>`;
-
-  /* pied */
-  h += `<div class="foot">
-    Source : ${esc(j.source||'GCatholic.org')}${j.derniere_mise_a_jour?` · mise à jour ${esc(j.derniere_mise_a_jour)}`:''}
-    ${j.code_gcatholic?`<br><a href="https://gcatholic.org/dioceses/diocese/${esc(j.code_gcatholic)}.htm" target="_blank" rel="noopener">Voir la fiche sur GCatholic ↗</a>`:''}
-    <br>Rapport servi en direct par l'API Carta Pastorale v2.3.0
-  </div>`;
-
-  pbody.innerHTML = h;
-}
-
-/* --- graphique d'évolution : 3 séries indexées base 100 --- */
-function drawTrend(tend){
-  const W=344, H=170, P={l:8,r:8,t:14,b:22};
-  const years = tend.map(t=>t.annee);
-  const series = [
-    {k:'catholiques', c:'#2563eb', label:'Catholiques'},
-    {k:'pretres',     c:'#dc2626', label:'Prêtres'},
-    {k:'seminaristes',c:'#16a34a', label:'Séminaristes'},
-  ].map(s => {
-    const pts = tend.map(t => t[s.k]).filter(v => v!=null);
-    if(pts.length < 2 || !pts[0]) return null;
-    return {...s, vals: tend.map(t => t[s.k]!=null ? 100*t[s.k]/pts[0] : null),
-            first: pts[0], last: pts[pts.length-1]};
-  }).filter(Boolean);
-  if(!series.length) return '';
-
-  const all = series.flatMap(s=>s.vals).filter(v=>v!=null);
-  const mn = Math.min(...all, 100), mx = Math.max(...all, 100);
-  const pad = (mx-mn)*0.12 || 1;
-  const y = v => P.t + (H-P.t-P.b) * (1 - (v-(mn-pad))/((mx+pad)-(mn-pad)));
-  const x = i => P.l + (W-P.l-P.r) * (years.length>1 ? i/(years.length-1) : 0.5);
-
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">`;
-  svg += `<line x1="${P.l}" y1="${y(100)}" x2="${W-P.r}" y2="${y(100)}" stroke="#cbd5e1" stroke-dasharray="3 3"/>`;
-  series.forEach(s => {
-    const pts = s.vals.map((v,i)=>v!=null?[x(i),y(v)]:null).filter(Boolean);
-    svg += `<polyline points="${pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')}" fill="none" stroke="${s.c}" stroke-width="2.2" stroke-linejoin="round"/>`;
-    pts.forEach(p => svg += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${s.c}"/>`);
-  });
-  years.forEach((yr,i) => {
-    svg += `<text x="${x(i)}" y="${H-7}" font-size="9.5" fill="#64748b" text-anchor="middle">${yr}</text>`;
-  });
-  svg += `</svg>`;
-  svg += `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;font-size:11px;color:#475569">` +
-    series.map(s=>`<span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${s.c};margin-right:4px"></span>${s.label} <b>${compact(s.first)} → ${compact(s.last)}</b></span>`).join('') +
-    `</div>`;
-  return svg;
-}
-
-/* --- rafraîchissement en arrière-plan depuis l'API --- */
-(async function refreshFromApi(){
-  try{
-    const ctrl = new AbortController();
-    setTimeout(()=>ctrl.abort(), 95000);
-    const r = await fetch(API + '/dioceses', {signal:ctrl.signal, headers: API_HEADERS});
-    if(!r.ok) return;
-    const live = await r.json();
-    setApiStatus(true);
-    if(Array.isArray(live) && live.length !== ALL.length){
-      const byId = Object.fromEntries(live.map(x=>[x.id,x]));
-      ALL.forEach(d => {
-        const l = byId[d.id];
-        if(l){ d.cath = l.catholiques; d.pct = l.pourcentage_catholiques; d.cat = l.categorie||d.cat; }
+      document.querySelectorAll('.nav-links a').forEach(link => {
+        link.classList.remove('active');
+        if (link.dataset.page === pageName) link.classList.add('active');
       });
-      renderMarkers(curCont);
-      toast('Données actualisées depuis l\'API');
+
+      document.getElementById('navLinks').classList.remove('active');
+      document.getElementById('navToggle').setAttribute('aria-expanded', 'false');
+
+      if (pageName === 'outil') {
+        updateStepIndicator();
+      } else {
+        document.getElementById('stepIndicator').classList.remove('visible');
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      if (pageName === 'outil') {
+        setTimeout(() => {
+          const line = document.getElementById('thalesLine');
+          if (line) line.classList.add('animated');
+        }, 600);
+      }
     }
-  }catch(e){ /* API endormie : les données embarquées restent valides */ }
-})();
 
-/* --- init --- */
-renderMarkers('');
-// lien partageable : index.html#d=fr-pari0 ouvre directement le rapport du diocèse
-const _h = new URLSearchParams(location.hash.slice(1));
-const _d = _h.get('d');
-if(_d && BY_ID[_d]) setTimeout(() => selectDiocese(_d), 500);
-</script>
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.getElementById('navLinks');
 
-<script>
-/* --- fenêtre info : À propos / Sources / Confidentialité / Projets --- */
-function openInfo(t){
-  document.getElementById('infoOverlay').classList.add('open');
-  switchInfoTab(t || 'apropos');
-}
-function closeInfo(){
-  document.getElementById('infoOverlay').classList.remove('open');
-}
-function switchInfoTab(t){
-  document.querySelectorAll('#infoTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
-  document.querySelectorAll('.info-tab').forEach(d => d.style.display = (d.id === 'info-' + t) ? 'block' : 'none');
-}
-document.addEventListener('keydown', e => { if(e.key === 'Escape') closeInfo(); });
-</script>
+    navToggle.addEventListener('click', function() {
+      const isExpanded = this.getAttribute('aria-expanded') === 'true';
+      this.setAttribute('aria-expanded', !isExpanded);
+      navLinks.classList.toggle('active');
+    });
+
+    const state = {
+      currentStep: 0,
+      situation: '',
+      situationType: '',
+      derive: '',
+      proportion: '',
+      action: ''
+    };
+
+    function loadState() {
+      try {
+        const saved = localStorage.getItem('bonAlignementState');
+        if (saved) Object.assign(state, JSON.parse(saved));
+      } catch(e) {}
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem('bonAlignementState', JSON.stringify(state));
+      } catch(e) {}
+    }
+
+    function clearState() {
+      try { localStorage.removeItem('bonAlignementState'); } catch(e) {}
+      Object.keys(state).forEach(key => { if (key !== 'currentStep') state[key] = ''; });
+      state.currentStep = 0;
+    }
+
+    function updateStepIndicator() {
+      const indicator = document.getElementById('stepIndicator');
+      if (state.currentStep >= 0 && state.currentStep <= 4) {
+        indicator.textContent = 'Étape ' + (state.currentStep + 1) + ' / 5';
+        indicator.classList.add('visible');
+      } else {
+        indicator.classList.remove('visible');
+      }
+    }
+
+    function showNotification(message) {
+      const notif = document.getElementById('notification');
+      notif.textContent = message;
+      notif.classList.add('show');
+      clearTimeout(notif._timeout);
+      notif._timeout = setTimeout(() => notif.classList.remove('show'), 3000);
+    }
+
+    function updateProgress() {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      document.getElementById('progressBar').style.width = (scrollTop / docHeight) * 100 + '%';
+    }
+    window.addEventListener('scroll', updateProgress, { passive: true });
+
+    const steps = ['etape1', 'etape2', 'transition', 'etape3', 'etape4', 'etape5'];
+
+    function goToStep(stepIndex) {
+      if (stepIndex < 0 || stepIndex >= steps.length) return;
+      state.currentStep = stepIndex;
+      saveState();
+
+      const outilPage = document.getElementById('page-outil');
+      if (!outilPage.classList.contains('active')) {
+        showPage('outil');
+        setTimeout(() => scrollToStep(stepIndex), 100);
+      } else {
+        scrollToStep(stepIndex);
+      }
+      updateStepIndicator();
+    }
+
+    function scrollToStep(stepIndex) {
+      const target = document.getElementById(steps[stepIndex]);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      if (steps[stepIndex] === 'etape3') {
+        setTimeout(() => {
+          const line = document.getElementById('thalesLine');
+          if (line) line.classList.add('animated');
+        }, 500);
+      }
+    }
+
+    const situationKeywords = {
+      'choix': ['choisir', 'dilemme', 'hesite', 'entre', 'decision', 'decider'],
+      'relation': ['ami', 'amie', 'copain', 'copine', 'mari', 'femme', 'famille', 'mere', 'pere', 'frere', 'soeur', 'collegue', 'relation'],
+      'travail': ['travail', 'job', 'boulot', 'carriere', 'profession', 'metier', 'boss', 'collegue', 'entreprise'],
+      'morale': ['mensonge', 'verite', 'honnete', 'droit', 'juste', 'ethique', 'conscience', 'culpabilite'],
+      'spiritualite': ['priere', 'dieu', 'foi', 'eglise', 'spirituel', 'ame', 'religion', 'croyance']
+    };
+
+    function detectSituationType(text) {
+      text = text.toLowerCase();
+      for (const [type, keywords] of Object.entries(situationKeywords)) {
+        if (keywords.some(kw => text.includes(kw))) return type;
+      }
+      return 'general';
+    }
+
+    function setupChoiceCards(container, callback) {
+      container.querySelectorAll('.choice-card').forEach(card => {
+        card.addEventListener('click', function() {
+          container.querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
+          this.classList.add('selected');
+          callback(this);
+        });
+      });
+    }
+
+    const situationInput = document.getElementById('situationInput');
+    const btnNext1 = document.getElementById('btnNext1');
+    const situationTypes = document.getElementById('situationTypes');
+    const situationAnalysis = document.getElementById('situationAnalysis');
+
+    situationInput.addEventListener('input', function() {
+      state.situation = this.value;
+      saveState();
+      if (this.value.length > 20) {
+        const type = detectSituationType(this.value);
+        situationTypes.style.display = 'grid';
+        situationTypes.querySelectorAll('.choice-card').forEach(card => {
+          card.classList.remove('selected');
+          if (card.dataset.type === type) {
+            card.classList.add('selected');
+            state.situationType = type;
+          }
+        });
+        const typeLabels = {
+          'choix': 'Je detecte un dilemme de choix',
+          'relation': 'Je detecte une tension relationnelle',
+          'travail': 'Je detecte une question professionnelle',
+          'morale': 'Je detecte une tension ethique',
+          'spiritualite': 'Je detecte une question de sens',
+          'general': 'Je lis ta situation avec attention'
+        };
+        situationAnalysis.innerHTML = '<p style="color:var(--accent);font-size:0.95rem;"><strong>' + (typeLabels[type] || typeLabels.general) + '</strong></p>';
+        saveState();
+      }
+    });
+
+    setupChoiceCards(situationTypes, function(card) {
+      state.situationType = card.dataset.type;
+      saveState();
+    });
+
+    btnNext1.addEventListener('click', function() {
+      if (!state.situation.trim()) {
+        showNotification('Decris dabord ta situation');
+        situationInput.focus();
+        return;
+      }
+      goToStep(1);
+    });
+
+    const deriveCards = document.querySelector('#etape2 .choices-grid');
+    const deriveAnalysis = document.getElementById('deriveAnalysis');
+    const btnNext2 = document.getElementById('btnNext2');
+    const btnBack2 = document.getElementById('btnBack2');
+
+    setupChoiceCards(deriveCards, function(card) {
+      state.derive = card.dataset.derive;
+      saveState();
+      const deriveTexts = {
+        'evitement': 'Tu tends a fuir ce qui te derange. Cette fuite elle-meme est un choix.',
+        'precipitation': 'Tu tends a courir pour ne pas penser. La vitesse peut etre une forme d evitement.',
+        'immobilite': 'Tu tends a rester fige par peur de te tromper. Ne pas choisir est aussi un choix.',
+        'engagement': 'Tu tends a avancer malgre le doute. C est courageux — mais vers quoi ?'
+      };
+      deriveAnalysis.innerHTML = '<p style="color:var(--text-muted);font-size:0.95rem;font-style:italic;">' + (deriveTexts[state.derive] || '') + '</p>';
+    });
+
+    btnNext2.addEventListener('click', function() {
+      if (!state.derive) { showNotification('Choisis ta tendance actuelle'); return; }
+      goToStep(2);
+    });
+    btnBack2.addEventListener('click', function() { goToStep(0); });
+
+    const proportionCards = document.querySelector('#etape3 .choices-grid');
+    const proportionAnalysis = document.getElementById('proportionAnalysis');
+    const btnNext3 = document.getElementById('btnNext3');
+    const btnBack3 = document.getElementById('btnBack3');
+
+    setupChoiceCards(proportionCards, function(card) {
+      state.proportion = card.dataset.proportion;
+      saveState();
+      const proportionTexts = {
+        'aligne': 'Ton action et ton horizon sont en phase.',
+        'derape': 'Il y a un decalage entre ce que tu fais et ce que tu vaux.',
+        'contradiction': 'Tu vis une tension entre ton dire et ton faire.',
+        'incertain': 'L incertitude est le lieu meme du discernement.'
+      };
+      proportionAnalysis.innerHTML = '<p style="color:var(--text-muted);font-size:0.95rem;font-style:italic;">' + (proportionTexts[state.proportion] || '') + '</p>';
+    });
+
+    btnNext3.addEventListener('click', function() {
+      if (!state.proportion) {
+        showNotification("Choisis comment tu qualifierais l'alignement");
+        return;
+      }
+      goToStep(4);
+    });
+    btnBack3.addEventListener('click', function() { goToStep(1); });
+
+    const actionInput = document.getElementById('actionInput');
+    const btnNext4 = document.getElementById('btnNext4');
+    const btnBack4 = document.getElementById('btnBack4');
+
+    actionInput.addEventListener('input', function() {
+      state.action = this.value;
+      saveState();
+    });
+
+    btnNext4.addEventListener('click', function() {
+      if (!state.action.trim()) {
+        showNotification('Propose-toi une action modeste');
+        actionInput.focus();
+        return;
+      }
+      generateSynthesis();
+      goToStep(5);
+    });
+    btnBack4.addEventListener('click', function() { goToStep(3); });
+
+    function generateSynthesis() {
+      var date = new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' });
+      var typeLabels = { 'choix': 'Un choix a faire', 'choix-fait': 'Un choix deja fait', 'habitude': 'Une habitude', 'relation': 'Une relation', 'general': 'Une situation' };
+      var deriveLabels = { 'evitement': "J'évite", 'precipitation': 'Je precipite', 'immobilite': 'Je suis bloque', 'engagement': "Je m'engage" };
+      var proportionLabels = { 'aligne': 'Ca tient debout', 'derape': 'Ca derape', 'contradiction': 'Contradiction', 'incertain': 'Je ne sais pas' };
+
+      function getDeriveInsight(d) {
+        var insights = {
+          'evitement': 'Je tends a fuir ce qui me derange.',
+          'precipitation': 'Je tends a courir pour ne pas penser.',
+          'immobilite': 'Je tends a rester fige par peur de me tromper.',
+          'engagement': 'Je tends a avancer malgre le doute.'
+        };
+        return insights[d] || '';
+      }
+
+      function getProportionInsight(p) {
+        var insights = {
+          'aligne': 'Mon action et mon horizon sont en phase.',
+          'derape': 'Il y a un decalage entre ce que je fais et ce que je vaux.',
+          'contradiction': 'Je vis une tension entre mon dire et mon faire.',
+          'incertain': 'L incertitude est le lieu meme du discernement.'
+        };
+        return insights[p] || '';
+      }
+
+      var synthesis = '═══════════════════════════════════════\n  MON DISCERNEMENT — ' + date + '\n═══════════════════════════════════════\n\nSITUATION\n' + state.situation + '\n\nType : ' + (typeLabels[state.situationType] || 'Situation personnelle') + '\n\nTENDANCE ACTUELLE (DERIVEE)\n' + (deriveLabels[state.derive] || 'Non specifiee') + '\n\nCe que cela revele :\n' + getDeriveInsight(state.derive) + '\n\nALIGNEMENT (PROPORTIONNALITE)\n' + (proportionLabels[state.proportion] || 'Non specifie') + '\n\nCe que cela revele :\n' + getProportionInsight(state.proportion) + '\n\nACTION ENVISAGEE\n' + state.action + '\n\n═══════════════════════════════════════\n\n"Un geste modeste, mais fidele a toi-meme,\nest deja une grande oeuvre."\n\n— Le Bon Alignement';
+
+      document.getElementById('synthesisContent').textContent = synthesis;
+    }
+
+    document.getElementById('btnCopy').addEventListener('click', function() {
+      var text = document.getElementById('synthesisContent').textContent;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(function() {
+          showNotification('Copie dans le presse-papiers');
+        });
+      } else {
+        var textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showNotification('Copie dans le presse-papiers');
+      }
+    });
+
+    document.getElementById('btnPDF').addEventListener('click', function() {
+      try {
+        if (typeof window.jspdf !== 'undefined') {
+          var doc = new window.jspdf.jsPDF();
+          doc.setFont('helvetica');
+          doc.setFontSize(11);
+          var lines = doc.splitTextToSize(document.getElementById('synthesisContent').textContent, 180);
+          doc.text(lines, 15, 20);
+          doc.save('mon-discernement.pdf');
+          showNotification('PDF telecharge');
+        } else {
+          showNotification('Erreur: jsPDF non charge');
+        }
+      } catch(e) {
+        showNotification('Erreur lors de la generation du PDF');
+      }
+    });
+
+    document.getElementById('btnRestart').addEventListener('click', function() {
+      if (confirm('Es-tu sur de vouloir recommencer ? Tes reponses seront effacees.')) {
+        clearState();
+        situationInput.value = '';
+        actionInput.value = '';
+        document.querySelectorAll('.choice-card').forEach(function(c) { c.classList.remove('selected'); });
+        situationTypes.style.display = 'none';
+        situationAnalysis.innerHTML = '';
+        deriveAnalysis.innerHTML = '';
+        proportionAnalysis.innerHTML = '';
+        document.getElementById('synthesisContent').textContent = '';
+        goToStep(0);
+        showNotification('Nouveau discernement commence');
+      }
+    });
+
+    loadState();
+
+    if (state.situation) situationInput.value = state.situation;
+    if (state.action) actionInput.value = state.action;
+
+    if (state.situationType) {
+      var card = document.querySelector('[data-type="' + state.situationType + '"]');
+      if (card) card.classList.add('selected');
+    }
+    if (state.derive) {
+      var card2 = document.querySelector('[data-derive="' + state.derive + '"]');
+      if (card2) card2.classList.add('selected');
+    }
+    if (state.proportion) {
+      var card3 = document.querySelector('[data-proportion="' + state.proportion + '"]');
+      if (card3) card3.classList.add('selected');
+    }
+
+    updateStepIndicator();
+
+    if (state.currentStep > 0 || state.situation || state.derive || state.proportion || state.action) {
+      showPage('outil');
+    } else {
+      showPage('accueil');
+    }
+  </script>
+
 </body>
 </html>
