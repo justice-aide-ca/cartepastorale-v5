@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carta Pastorale — Carte mondiale des diocèses</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+  :root{
+    --ink:#1e293b; --muted:#64748b; --line:#e2e8f0; --bg:#f8fafc;
+    --blue:#2563eb; --red:#dc2626; --amber:#f59e0b; --teal:#0d9488; --gray:#9ca3af;
+    --panel-w:400px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink)}
+  #map{position:absolute;inset:0;background:#dbeafe}
+  .leaflet-container{font:inherit}
+
+  /* --- panneau de contrôle --- */
+  #ctrl{position:absolute;top:14px;left:14px;z-index:1000;width:330px;max-width:calc(100vw - 28px);
+    background:rgba(255,255,255,.96);backdrop-filter:blur(6px);border-radius:14px;
+    box-shadow:0 8px 30px rgba(15,23,42,.18);border:1px solid var(--line);overflow:hidden}
+  #ctrl .hd{padding:12px 14px 10px;border-bottom:1px solid var(--line)}
+  #ctrl h1{font-size:16px;font-weight:700;letter-spacing:-.01em}
+  #ctrl h1 span{color:var(--blue)}
+  #ctrl .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+  #searchbox{position:relative;padding:10px 12px 6px}
+  #q{width:100%;padding:9px 12px 9px 34px;font-size:13.5px;border:1.5px solid var(--line);border-radius:10px;outline:none;background:#fff}
+  #q:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  #searchbox svg{position:absolute;left:23px;top:21px;width:15px;height:15px;stroke:var(--muted)}
+  #sugg{position:absolute;left:12px;right:12px;top:48px;background:#fff;border:1px solid var(--line);
+    border-radius:10px;box-shadow:0 10px 26px rgba(15,23,42,.16);max-height:290px;overflow:auto;display:none;z-index:20}
+  #sugg .it{padding:8px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+  #sugg .it:hover{background:#eff6ff}
+  #sugg .it .pays{color:var(--muted);font-size:11px;white-space:nowrap}
+  #sugg .it .nopos{font-size:10px;color:#b45309}
+  #chips{display:flex;flex-wrap:wrap;gap:5px;padding:8px 12px 12px}
+  .chip{font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--muted)}
+  .chip:hover{border-color:var(--blue);color:var(--blue)}
+  .chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+  #statsline{padding:7px 14px;font-size:11px;color:var(--muted);border-top:1px solid var(--line);background:var(--bg)}
+
+  /* --- légende --- */
+  #legend{position:absolute;bottom:18px;left:14px;z-index:1000;background:rgba(255,255,255,.94);
+    border:1px solid var(--line);border-radius:12px;padding:9px 12px;font-size:11px;color:var(--muted);
+    box-shadow:0 4px 16px rgba(15,23,42,.12)}
+  #legend .row{display:flex;align-items:center;gap:7px;margin:3px 0}
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:none}
+  .dot.approx{border:2px dashed #fff;box-shadow:0 0 0 1px var(--muted);opacity:.75}
+
+  /* --- marqueurs --- */
+  .mk{border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+  .mk.approx{opacity:.72;border-style:dashed}
+
+  /* --- panneau latéral --- */
+  #panel{position:absolute;top:0;right:0;height:100%;width:var(--panel-w);max-width:100vw;z-index:1100;
+    background:#fff;border-left:1px solid var(--line);box-shadow:-10px 0 34px rgba(15,23,42,.16);
+    transform:translateX(105%);transition:transform .28s ease;display:flex;flex-direction:column}
+  #panel.open{transform:translateX(0)}
+  #panel .ph{padding:16px 18px 12px;border-bottom:1px solid var(--line);position:relative;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff}
+  #panel .ph h2{font-size:18px;font-weight:700;letter-spacing:-.01em;padding-right:30px}
+  #panel .ph .meta{font-size:12px;opacity:.9;margin-top:3px}
+  #panel .ph .badge{display:inline-block;font-size:10.5px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);
+    padding:2px 9px;border-radius:999px;margin-top:7px}
+  #close{position:absolute;top:12px;right:12px;width:28px;height:28px;border:none;border-radius:8px;
+    background:rgba(255,255,255,.18);color:#fff;font-size:15px;cursor:pointer;line-height:1}
+  #close:hover{background:rgba(255,255,255,.32)}
+  #pbody{flex:1;overflow-y:auto;padding:14px 16px 26px}
+  .sec{margin-bottom:18px}
+  .sec h3{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:8px;
+    display:flex;align-items:center;gap:6px}
+  .sec h3::after{content:"";flex:1;height:1px;background:var(--line)}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+  .card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 9px}
+  .card .v{font-size:16px;font-weight:700;letter-spacing:-.02em}
+  .card .l{font-size:10px;color:var(--muted);margin-top:1px}
+  .ind{border-left:3px solid var(--blue);background:var(--bg);border-radius:0 8px 8px 0;padding:8px 10px;margin-bottom:7px}
+  .ind .t{font-size:12.5px;font-weight:600;display:flex;justify-content:space-between;gap:8px}
+  .ind .t .val{color:var(--blue);white-space:nowrap}
+  .ind .ref{font-size:10.5px;color:var(--muted)}
+  .ind .interp{font-size:11.5px;color:#475569;margin-top:3px;line-height:1.45}
+  .pill{display:inline-block;font-size:10.5px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;
+    padding:2px 8px;border-radius:999px;margin:2px 3px 2px 0}
+  .ctx{font-size:12.5px;line-height:1.55;color:#334155;background:var(--bg);border:1px solid var(--line);
+    border-radius:10px;padding:10px 12px}
+  .kv{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 2px;border-bottom:1px dashed var(--line)}
+  .kv:last-child{border-bottom:none}
+  .kv b{font-weight:600}
+  ul.pistes{list-style:none}
+  ul.pistes li{font-size:12.5px;line-height:1.5;padding:7px 10px;background:#f0fdf4;border:1px solid #bbf7d0;
+    border-radius:8px;margin-bottom:6px}
+  ul.quests{list-style:none}
+  ul.quests li{font-size:12.5px;line-height:1.5;padding:7px 10px;background:#eff6ff;border:1px solid #bfdbfe;
+    border-radius:8px;margin-bottom:6px;font-style:italic}
+  .foot{font-size:10.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:9px;margin-top:4px;line-height:1.6}
+  .foot a{color:var(--blue);text-decoration:none}
+  .loading{text-align:center;padding:44px 20px;color:var(--muted);font-size:13px}
+  .spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--blue);border-radius:50%;
+    margin:0 auto 12px;animation:sp 0.9s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:10px;padding:14px;font-size:12.5px;text-align:center}
+  .err button{margin-top:9px;background:var(--blue);color:#fff;border:none;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:12.5px}
+  #toast{position:absolute;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);z-index:1300;
+    background:#1e293b;color:#fff;font-size:12.5px;padding:9px 18px;border-radius:10px;opacity:0;transition:.3s;pointer-events:none}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #apiStatus{display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:5px;vertical-align:1px}
+  #apiStatus.on{background:#16a34a}
+  @media (max-width:640px){
+    #ctrl{width:calc(100vw - 20px);left:10px;top:10px}
+    #panel{width:100vw}
+    #legend{display:none}
+  }
+  /* --- bouton info (dans le panneau de contrôle) & fenêtre modale --- */
+  #ctrl .hd{position:relative}
+  #infoBtn{position:absolute;top:11px;right:11px;width:24px;height:24px;border-radius:50%;
+    border:1px solid var(--line);background:#fff;font-size:12px;font-weight:700;color:var(--muted);
+    cursor:pointer;font-family:Georgia,serif;line-height:1;padding:0}
+  #infoBtn:hover{color:var(--blue);border-color:var(--blue);background:#eff6ff}
+  #infoOverlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1400;display:none;
+    align-items:center;justify-content:center;padding:18px}
+  #infoOverlay.open{display:flex}
+  #infoModal{background:#fff;border-radius:16px;max-width:660px;width:100%;max-height:85vh;
+    display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(15,23,42,.3);overflow:hidden}
+  #infoModal .im-head{padding:16px 18px 0;border-bottom:1px solid var(--line);position:relative}
+  #infoModal h2{font-size:17px;margin-bottom:10px;letter-spacing:-.01em}
+  #infoModal .im-close{position:absolute;top:12px;right:14px;border:none;background:#f1f5f9;width:30px;height:30px;
+    border-radius:8px;cursor:pointer;font-size:14px;color:var(--muted)}
+  #infoModal .im-close:hover{background:#e2e8f0}
+  #infoTabs{display:flex;gap:2px;flex-wrap:wrap}
+  #infoTabs button{border:none;background:none;padding:8px 10px;font-size:12.5px;color:var(--muted);
+    cursor:pointer;border-bottom:2px solid transparent;font-weight:600;font-family:inherit}
+  #infoTabs button.on{color:var(--blue);border-bottom-color:var(--blue)}
+  #infoBody{padding:16px 20px 22px;overflow-y:auto;font-size:13px;line-height:1.6;color:#334155}
+  #infoBody h4{font-size:12.5px;margin:14px 0 6px;color:var(--ink)}
+  #infoBody ul{margin:6px 0 6px 18px}
+  #infoBody li{margin-bottom:4px}
+  .src-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--bg)}
+  .src-card b{font-size:12.5px}
+  .src-card p{font-size:12px;color:var(--muted);margin:2px 0 4px}
+  .src-card a{color:var(--blue);font-size:12px;text-decoration:none;font-weight:600}
+  .src-card a:hover{text-decoration:underline}
+  .proj-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .proj-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg)}
+  .proj-card b{font-size:12.5px;display:block;margin-bottom:2px}
+  .proj-card p{font-size:11.5px;color:var(--muted);margin-bottom:5px}
+  .proj-card a{font-size:11.5px;color:var(--blue);text-decoration:none;font-weight:600}
+  .proj-card a.soon{color:var(--gray);pointer-events:none}
+  @media(max-width:640px){.proj-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="ctrl">
+  <div class="hd">
+    <h1>Carta <span>Pastorale</span> 🗺️</h1>
+    <div class="sub">Carte mondiale des diocèses — rapports pastoraux en direct de l'API</div>
+    <button id="infoBtn" title="À propos, sources, confidentialité" onclick="openInfo('apropos')">i</button>
+  </div>
+  <div id="searchbox">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    <input id="q" type="text" placeholder="Rechercher votre diocèse… (ex : Lyon, Kinshasa, Boston)" autocomplete="off">
+    <div id="sugg"></div>
+  </div>
+  <div id="chips"></div>
+  <div id="statsline"><span id="apiStatus"></span><span id="statsTxt">Chargement…</span></div>
+</div>
+
+<div id="legend">
+  <div class="row"><span class="dot" style="background:#dc2626"></span>Archidiocèse métropolitain</div>
+  <div class="row"><span class="dot" style="background:#f59e0b"></span>Archidiocèse</div>
+  <div class="row"><span class="dot" style="background:#2563eb"></span>Diocèse</div>
+  <div class="row"><span class="dot" style="background:#0d9488"></span>Autre juridiction</div>
+  <div class="row"><span class="dot approx" style="background:#2563eb"></span>Position approximative</div>
+</div>
+
+<aside id="panel">
+  <div class="ph">
+    <button id="close" title="Fermer">✕</button>
+    <h2 id="pTitle">…</h2>
+    <div class="meta" id="pMeta"></div>
+    <span class="badge" id="pBadge"></span>
+  </div>
+  <div id="pbody"></div>
+</aside>
+
+<div id="infoOverlay" onclick="if(event.target===this)closeInfo()">
+  <div id="infoModal">
+    <div class="im-head">
+      <button class="im-close" onclick="closeInfo()" title="Fermer">✕</button>
+      <h2>Carta Pastorale 🗺️</h2>
+      <div id="infoTabs">
+        <button data-t="apropos" class="on" onclick="switchInfoTab('apropos')">À propos</button>
+        <button data-t="sources" onclick="switchInfoTab('sources')">Sources</button>
+        <button data-t="conf" onclick="switchInfoTab('conf')">Confidentialité</button>
+        <button data-t="projets" onclick="switchInfoTab('projets')">Autres projets</button>
+      </div>
+    </div>
+    <div id="infoBody">
+
+      <div class="info-tab" id="info-apropos">
+        <p>Carte mondiale des <b>3 220 circonscriptions ecclésiales catholiques</b> (diocèses, archidiocèses, missions, prélatures…). Cliquez sur un point pour obtenir son <b>rapport pastoral complet</b>, généré en direct par l'API Carta Pastorale : statistiques, évolution, indicateurs, contexte du pays, pistes de discernement.</p>
+        <h4>Cet outil EST</h4>
+        <ul>
+          <li>Une carte de référence des circonscriptions ecclésiales</li>
+          <li>Un support pédagogique pour la formation et le discernement pastoral</li>
+          <li>Basé sur des données publiques et vérifiables (voir onglet Sources)</li>
+          <li>Un projet personnel sans affiliation institutionnelle</li>
+        </ul>
+        <h4>Cet outil N'EST PAS</h4>
+        <ul>
+          <li>Un document officiel du Saint-Siège ni une source juridique canonique</li>
+          <li>Une géolocalisation précise : 250 positions sont <b>approximatives</b> (marqueurs en pointillés, centrées sur le pays)</li>
+          <li>Nécessairement exhaustif : certaines missions récentes peuvent manquer</li>
+        </ul>
+      </div>
+
+      <div class="info-tab" id="info-sources" style="display:none">
+        <div class="src-card"><b>GCatholic.org</b>
+          <p>Source principale : base de données mondiale des structures ecclésiales (catholiques, prêtres, paroisses, historique).</p>
+          <a href="https://gcatholic.org" target="_blank" rel="noopener">gcatholic.org ↗</a></div>
+        <div class="src-card"><b>API Carta Pastorale</b>
+          <p>Rapports pastoraux servis en direct : indicateurs, évolutions, contexte pays (IDH, PIB, liberté religieuse).</p>
+          <a href="https://carta-pastorale.onrender.com" target="_blank" rel="noopener">carta-pastorale.onrender.com ↗</a></div>
+        <div class="src-card"><b>Catholic-Hierarchy.org</b>
+          <p>Répertoire indépendant des diocèses et évêques, maintenu par David M. Cheney.</p>
+          <a href="https://www.catholic-hierarchy.org" target="_blank" rel="noopener">catholic-hierarchy.org ↗</a></div>
+        <div class="src-card"><b>Annuario Pontificio &amp; Annus Statisticus Ecclesiae</b>
+          <p>Annuaire officiel du Saint-Siège et recueil statistique annuel (Librairie Éditrice Vaticane).</p></div>
+        <div class="src-card"><b>OpenStreetMap &amp; Leaflet</b>
+          <p>Fond de carte libre © contributeurs OpenStreetMap (ODbL) · moteur de carte open-source Leaflet.</p>
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">openstreetmap.org/copyright ↗</a> &nbsp;
+          <a href="https://leafletjs.com" target="_blank" rel="noopener">leafletjs.com ↗</a></div>
+      </div>
+
+      <div class="info-tab" id="info-conf" style="display:none">
+        <ul>
+          <li><b>Aucun cookie</b>, aucun traceur, aucun compte utilisateur.</li>
+          <li><b>Aucune donnée personnelle</b> n'est collectée, stockée ou revendue — rien n'est enregistré sur votre appareil.</li>
+          <li>La <b>recherche</b> s'effectue localement, dans votre navigateur.</li>
+          <li>Le clic sur une fiche interroge l'API (carta-pastorale.onrender.com) : comme pour toute visite web, ce serveur peut journaliser une adresse IP technique, sans profilage.</li>
+          <li>Votre <b>position géographique n'est jamais demandée</b>.</li>
+          <li>Le <b>code source est lisible</b> : clic droit → « Afficher le code source de la page ».</li>
+        </ul>
+      </div>
+
+      <div class="info-tab" id="info-projets" style="display:none">
+        <div class="verse">« L'amour et la vérité se rencontrent, la justice et la paix s'embrassent. »
+          <span>— Psaume 85, 11 · le fil qui relie ces quatre projets</span></div>
+        <div class="proj-grid">
+          <div class="proj-card"><b>🧭 Le Bon Alignement</b>
+            <span class="vtag">« Amour et vérité se rencontrent »</span>
+            <p>Outil gratuit et 100 % confidentiel de discernement éthique : nommer ce qui est en jeu dans vos choix.</p>
+            <a href="https://lebon-juste-alignement.netlify.app/" target="_blank" rel="noopener">Visiter ↗</a></div>
+          <div class="proj-card"><b>🏠 Au Foyer de l'Amour</b>
+            <span class="vtag">« Justice et paix s'embrassent »</span>
+            <p>Discernement spirituel et « petite lumière » : textes à méditer, prières, exercices ignatiens, écoute.</p>
+            <a href="https://amour-et-verite-app.netlify.app/" target="_blank" rel="noopener">Visiter ↗</a></div>
+          <div class="proj-card"><b>⚖️ Justice AI</b>
+            <p>Assistance juridique avec IA, anonyme et gratuite : comprendre vos droits, à titre éducatif.</p>
+            <a href="https://justice-ai-anonyme-2.onrender.com/" target="_blank" rel="noopener">Visiter ↗</a></div>
+          <div class="proj-card"><b>🌉 ONBRIDGE AI</b>
+            <p>Un pont entre vos projets et l'intelligence artificielle.</p>
+            <a href="https://bridge-your-project.lovable.app/" target="_blank" rel="noopener">Visiter ↗</a></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="data.js"></script>
+<script>
+/* ============ Carta Pastorale — carte v6 connectée à l'API ============ */
+const API = 'https://carta-pastorale.onrender.com';
+const API_KEY = ''; // ← collez votre clé API ici si un jour l'API la demande (envoyée en en-tête X-API-Key)
+const API_HEADERS = API_KEY ? {'X-API-Key': API_KEY} : {};
+
+/* --- index des données embarquées --- */
+const ALL = DIOCESES.map(r => ({id:r[0], nom:r[1], pays:r[2], cont:r[3], cat:r[4],
+                                cath:r[5], pct:r[6], lat:r[7], lng:r[8], exact:r[9]===1}));
+const BY_ID = Object.fromEntries(ALL.map(d => [d.id, d]));
+const norm = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const fmt = n => (n==null ? '—' : n.toLocaleString('fr-FR'));
+const compact = n => n==null ? '—' : (Math.abs(n)>=1e6 ? (n/1e6).toFixed(2).replace('.',',')+' M'
+                                      : n.toLocaleString('fr-FR'));
+const esc = s => String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const md = s => esc(s).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+
+const CAT_COLOR = c => ({
+  'archidiocèse métropolitain':'#dc2626',
+  'archidiocèse':'#f59e0b',
+  'diocèse':'#2563eb',
+  'administration apostolique':'#0d9488',
+  'autre':'#0d9488'
+}[c] || '#9ca3af');
+
+/* --- carte --- */
+const map = L.map('map', {worldCopyJump:true, minZoom:2, zoomControl:false}).setView([22, 8], 2.4);
+L.control.zoom({position:'bottomright'}).addTo(map);
+const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom:18, zIndex:2, attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · données : API Carta Pastorale (GCatholic)'
+}).addTo(map);
+
+/* --- fond autonome sous OSM + bascule hors ligne si OSM ne répond pas --- */
+let osmOk = false;
+osm.on('tileload', () => { osmOk = true; });
+addAutonomousGrid();
+setTimeout(() => {
+  if (!osmOk) {
+    map.removeLayer(osm);
+    addContinents();
+    L.control.attribution({prefix:false}).addAttribution('données : API Carta Pastorale (GCatholic)').addTo(map);
+    toast('Fond de carte hors ligne activé');
+  }
+}, 8000);
+
+function addAutonomousGrid(){
+  L.GridLayer.AutonomousMap = L.GridLayer.extend({
+    createTile: function(coords){
+      const tile = document.createElement('canvas');
+      const ts = this.getTileSize();
+      tile.setAttribute('width', ts.x); tile.setAttribute('height', ts.y);
+      const ctx = tile.getContext('2d');
+      ctx.fillStyle = '#c5e3ec'; ctx.fillRect(0, 0, ts.x, ts.y);
+      const s = ts.x, n = Math.pow(2, coords.z);
+      const nwLng = coords.x / n * 360 - 180;
+      const nwLatR = Math.atan(Math.sinh(Math.PI * (1 - 2 * coords.y / n)));
+      const seLatR = Math.atan(Math.sinh(Math.PI * (1 - 2 * (coords.y + 1) / n)));
+      const per = 360 / n;
+      const merc = la => Math.log(Math.tan(la / 2 + Math.PI / 4));
+      const latY = la => ((merc(la * Math.PI / 180) - merc(nwLatR)) / (merc(seLatR) - merc(nwLatR))) * s;
+      const lngX = ln => ((ln - nwLng) / per) * s;
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 0.8;
+      for (let ln = Math.ceil(nwLng / 10) * 10; ln < nwLng + per; ln += 10) {
+        const px = lngX(ln); ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, s); ctx.stroke();
+      }
+      const nwLat = nwLatR * 180 / Math.PI, seLat = seLatR * 180 / Math.PI;
+      for (let la = Math.ceil(nwLat / 10) * 10; la > seLat - 5; la -= 10) {
+        const py = latY(la);
+        if (py >= -10 && py <= s + 10) { ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(s, py); ctx.stroke(); }
+      }
+      return tile;
+    }
+  });
+  const g = new L.GridLayer.AutonomousMap({zIndex: 1});
+  g.addTo(map);
+}
+
+function addContinents(){
+  const CONT = [
+    [[75,-170],[75,-50],[60,-50],[60,-80],[50,-60],[45,-55],[40,-70],[35,-75],[25,-80],[20,-105],[15,-90],[10,-85],[5,-78],[8,-60],[15,-60],[25,-80],[30,-115],[35,-120],[40,-125],[45,-125],[50,-130],[55,-135],[60,-140],[65,-165],[70,-170],[75,-170]],
+    [[15,-60],[5,-50],[0,-50],[-5,-35],[-10,-35],[-15,-40],[-20,-40],[-25,-45],[-30,-50],[-35,-55],[-40,-65],[-45,-65],[-50,-75],[-55,-70],[-55,-65],[-50,-70],[-45,-75],[-40,-73],[-35,-72],[-30,-71],[-25,-70],[-20,-70],[-15,-75],[-10,-78],[-5,-80],[0,-80],[5,-78],[10,-75],[12,-77],[12,-72],[10,-60],[15,-60]],
+    [[70,-25],[70,30],[65,30],[65,40],[60,45],[55,50],[50,40],[45,40],[40,30],[35,25],[35,15],[40,10],[45,0],[50,-10],[55,-10],[60,0],[65,10],[70,-10],[70,-25]],
+    [[35,-10],[40,10],[35,25],[30,30],[25,35],[20,35],[15,15],[10,15],[5,10],[0,10],[-5,12],[-10,15],[-15,12],[-20,17],[-25,15],[-30,17],[-35,20],[-30,30],[-25,32],[-20,35],[-15,35],[-10,40],[-5,40],[0,45],[5,45],[10,50],[15,50],[20,45],[25,40],[30,35],[35,30],[35,-10]],
+    [[75,30],[75,60],[70,60],[70,100],[65,100],[65,120],[60,120],[60,140],[55,140],[55,160],[50,160],[50,140],[45,140],[45,130],[40,130],[40,120],[35,120],[35,110],[30,110],[30,100],[25,100],[25,90],[20,90],[20,80],[15,80],[10,80],[10,75],[8,78],[8,92],[10,100],[15,105],[20,110],[25,115],[30,120],[35,125],[40,130],[45,135],[50,140],[55,145],[60,150],[65,170],[70,180],[75,180],[75,30]],
+    [[-10,115],[-15,115],[-20,115],[-25,115],[-30,115],[-35,115],[-40,115],[-40,140],[-35,145],[-30,150],[-25,150],[-20,148],[-15,145],[-10,140],[-10,115]],
+    [[85,-75],[85,-10],[80,-10],[80,-20],[75,-20],[75,-30],[70,-30],[70,-40],[65,-40],[65,-50],[70,-50],[70,-60],[75,-60],[75,-70],[80,-70],[80,-75],[85,-75]],
+    [[60,-11],[58,-4],[55,-6],[52,-5],[50,-5],[50,-10],[52,-10],[55,-8],[58,-11],[60,-11]],
+    [[46,140],[44,143],[40,140],[35,136],[33,130],[35,129],[38,140],[42,141],[46,140]],
+    [[-34,172],[-37,175],[-42,174],[-47,166],[-47,168],[-42,172],[-37,177],[-34,172]],
+    [[-12,43],[-16,44],[-20,44],[-25,47],[-26,44],[-24,43],[-20,43],[-16,43],[-12,43]],
+    [[5,95],[5,140],[0,140],[0,130],[-5,130],[-5,140],[-10,140],[-10,150],[-5,150],[0,150],[5,150],[5,95]],
+    [[20,120],[18,122],[15,121],[12,125],[10,120],[12,118],[15,120],[18,119],[20,120]]
+  ];
+  CONT.forEach(poly => L.polygon(poly, {color:'#8fbfa0', weight:1, fillColor:'#b8d4c2', fillOpacity:0.6, interactive:false}).addTo(map));
+}
+
+const cluster = L.markerClusterGroup({
+  chunkedLoading:true, chunkInterval:60, chunkDelay:20,
+  disableClusteringAtZoom:9, spiderfyOnMaxZoom:true, maxClusterRadius:46
+});
+map.addLayer(cluster);
+const MARKERS = {};
+
+function iconFor(d){
+  const c = CAT_COLOR(d.cat);
+  const s = d.exact ? 13 : 11;
+  return L.divIcon({className:'', iconSize:[s,s], iconAnchor:[s/2,s/2],
+    html:`<div class="mk ${d.exact?'':'approx'}" style="width:${s}px;height:${s}px;background:${c}"></div>`});
+}
+function renderMarkers(cont){
+  cluster.clearLayers();
+  for(const k in MARKERS) delete MARKERS[k];
+  const batch = [];
+  for(const d of ALL){
+    if(d.lat==null) continue;
+    if(cont && d.cont!==cont) continue;
+    const m = L.marker([d.lat, d.lng], {icon:iconFor(d), title:d.nom});
+    m.bindTooltip(`<b>${esc(d.nom)}</b> — ${esc(d.pays)}${d.exact?'':'<br><i style="color:#b45309">position approximative</i>'}`,
+                  {direction:'top', offset:[0,-6]});
+    m.on('click', () => openPanel(d.id));
+    MARKERS[d.id] = m;
+    batch.push(m);
+  }
+  cluster.addLayers(batch);
+  updateStats(cont);
+}
+function updateStats(cont){
+  const shown = Object.keys(MARKERS).length;
+  const exact = ALL.filter(d=>d.exact).length;
+  document.getElementById('statsTxt').textContent =
+    `${shown.toLocaleString('fr-FR')} diocèses affichés · ${exact.toLocaleString('fr-FR')} positions exactes / ${ALL.length.toLocaleString('fr-FR')}`;
+}
+
+/* --- filtres continent --- */
+const CONTS = ['Tous','Afrique','Amérique du Nord','Amérique latine','Asie','Europe','Océanie','Autre'];
+let curCont = '';
+const chipsEl = document.getElementById('chips');
+for(const c of CONTS){
+  const b = document.createElement('button');
+  b.className = 'chip' + (c==='Tous' ? ' on' : '');
+  b.textContent = c;
+  b.onclick = () => {
+    curCont = (c==='Tous') ? '' : c;
+    chipsEl.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    renderMarkers(curCont);
+  };
+  chipsEl.appendChild(b);
+}
+
+/* --- recherche --- */
+const q = document.getElementById('q'), sugg = document.getElementById('sugg');
+q.addEventListener('input', () => {
+  const v = norm(q.value.trim());
+  if(v.length < 2){ sugg.style.display='none'; return; }
+  const hits = ALL.filter(d => norm(d.nom).includes(v) || norm(d.pays).includes(v)).slice(0, 8);
+  if(!hits.length){ sugg.style.display='none'; return; }
+  sugg.innerHTML = hits.map(d =>
+    `<div class="it" data-id="${d.id}"><span>${esc(d.nom)}${d.lat==null?' <span class="nopos">· sans position</span>':''}</span><span class="pays">${esc(d.pays)}</span></div>`).join('');
+  sugg.style.display = 'block';
+  sugg.querySelectorAll('.it').forEach(el => el.onclick = () => {
+    sugg.style.display='none'; q.value = BY_ID[el.dataset.id].nom; selectDiocese(el.dataset.id);
+  });
+});
+q.addEventListener('keydown', e => {
+  if(e.key === 'Enter'){
+    const v = norm(q.value.trim());
+    const hit = ALL.find(d => norm(d.nom) === v) || ALL.find(d => norm(d.nom).includes(v));
+    if(hit){ sugg.style.display='none'; selectDiocese(hit.id); }
+  }
+  if(e.key === 'Escape') sugg.style.display='none';
+});
+document.addEventListener('click', e => { if(!sugg.contains(e.target) && e.target!==q) sugg.style.display='none'; });
+
+function selectDiocese(id){
+  const d = BY_ID[id];
+  if(!d) return;
+  try{ history.replaceState(null, '', '#d=' + id); }catch(e){}
+  if(d.lat != null){
+    map.flyTo([d.lat, d.lng], 8, {duration:1.1});
+    setTimeout(() => { const m = MARKERS[id]; if(m) cluster.zoomToShowLayer(m, () => m.openTooltip()); }, 1200);
+  } else {
+    toast(`« ${d.nom} » : position non disponible — rapport affiché`);
+  }
+  openPanel(id);
+}
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 3200);
+}
+
+/* --- panneau latéral --- */
+const panel = document.getElementById('panel'), pbody = document.getElementById('pbody');
+document.getElementById('close').onclick = () => panel.classList.remove('open');
+document.addEventListener('keydown', e => { if(e.key==='Escape') panel.classList.remove('open'); });
+
+let fetchTimer = null;
+function openPanel(id){
+  const d = BY_ID[id];
+  panel.classList.add('open');
+  document.getElementById('pTitle').textContent = d.nom;
+  document.getElementById('pMeta').textContent = `${d.pays} · ${d.cont}`;
+  document.getElementById('pBadge').textContent = d.cat;
+  pbody.innerHTML = `<div class="loading"><div class="spin"></div>
+    Chargement du rapport pastoral…<br>
+    <span style="font-size:11px" id="wake">(le serveur peut mettre ~1 min à se réveiller — <span id="elapsed">0</span> s)</span></div>`;
+  let sec = 0;
+  clearInterval(fetchTimer);
+  fetchTimer = setInterval(() => { const e=document.getElementById('elapsed'); if(e) e.textContent = ++sec; }, 1000);
+  fetchDetail(id, d, 0);
+}
+async function fetchDetail(id, d, attempt){
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 85000);
+  try{
+    const r = await fetch(`${API}/dioceses/${encodeURIComponent(id)}`, {signal: ctrl.signal, headers: API_HEADERS});
+    clearTimeout(to);
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    clearInterval(fetchTimer);
+    setApiStatus(true);
+    renderDetail(j, d);
+  }catch(err){
+    clearTimeout(to);
+    if(attempt < 1){ fetchDetail(id, d, attempt+1); return; }
+    clearInterval(fetchTimer);
+    pbody.innerHTML = `<div class="err">⚠️ Impossible de joindre l'API pour le moment.<br>
+      <span style="font-size:11px">${esc(String(err))}</span><br>
+      <button onclick="openPanel('${id}')">Réessayer</button></div>
+      ${summaryFallback(d)}`;
+  }
+}
+function setApiStatus(on){
+  const el = document.getElementById('apiStatus');
+  if(el) el.className = on ? 'on' : '';
+  if(el) el.id = 'apiStatus';
+}
+
+function summaryFallback(d){
+  return `<div class="sec" style="margin-top:14px"><h3>Données hors ligne</h3>
+    <div class="cards">
+      <div class="card"><div class="v">${compact(d.cath)}</div><div class="l">Catholiques</div></div>
+      <div class="card"><div class="v">${d.pct!=null?d.pct+' %':'—'}</div><div class="l">% catholiques</div></div>
+      <div class="card"><div class="v">${esc(d.cat)}</div><div class="l">Catégorie</div></div>
+    </div></div>`;
+}
+
+function card(v, l){ return `<div class="card"><div class="v">${v}</div><div class="l">${l}</div></div>`; }
+
+function renderDetail(j, d){
+  document.getElementById('pTitle').textContent = j.nom || d.nom;
+  document.getElementById('pMeta').textContent = `${j.pays_nom || d.pays} · ${j.continent || d.cont}`;
+  document.getElementById('pBadge').textContent = (j.categorie || d.cat) + (j.annee_donnees ? ` · données ${j.annee_donnees}` : '');
+
+  let h = '';
+
+  /* territoire & ressources */
+  const t = j.territoire || {}, r = j.ressources || {};
+  const cards = [];
+  if(t.catholiques!=null)        cards.push(card(compact(t.catholiques),'Catholiques'));
+  if(t.pourcentage_catholiques!=null) cards.push(card(t.pourcentage_catholiques+' %','% catholiques'));
+  if(t.population_totale!=null)  cards.push(card(compact(t.population_totale),'Population'));
+  if(t.superficie_km2!=null)     cards.push(card(compact(t.superficie_km2)+' km²','Superficie'));
+  if(r.total_pretres!=null)      cards.push(card(fmt(r.total_pretres),'Prêtres'));
+  if(r.paroisses!=null)          cards.push(card(fmt(r.paroisses),'Paroisses'));
+  if(r.pretres_diocesains!=null) cards.push(card(fmt(r.pretres_diocesains),'Prêtres diocésains'));
+  if(r.pretres_religieux!=null)  cards.push(card(fmt(r.pretres_religieux),'Prêtres religieux'));
+  if(r.religieuses!=null)        cards.push(card(fmt(r.religieuses),'Religieuses'));
+  if(r.diacres_permanents!=null) cards.push(card(fmt(r.diacres_permanents),'Diacres perm.'));
+  if(cards.length) h += `<div class="sec"><h3>Chiffres clés</h3><div class="cards">${cards.join('')}</div></div>`;
+
+  /* évolution */
+  if(Array.isArray(j.tendances) && j.tendances.length >= 2)
+    h += `<div class="sec"><h3>Évolution (indice base 100)</h3>${drawTrend(j.tendances)}</div>`;
+
+  /* indicateurs */
+  if(Array.isArray(j.indicateurs) && j.indicateurs.length){
+    h += `<div class="sec"><h3>Indicateurs pastoraux</h3>` + j.indicateurs.map(i =>
+      `<div class="ind"><div class="t"><span>${esc(i.nom)}</span><span class="val">${fmt(i.valeur)} ${esc(i.unite||'')}</span></div>
+       <div class="ref">réf. monde : ${fmt(i.ref_monde)} ${esc(i.unite||'')}</div>
+       <div class="interp">${esc(i.interpretation)}</div></div>`).join('') + `</div>`;
+  }
+
+  /* contexte pays */
+  const ctx = [];
+  if(j.idh!=null){
+    const c = j.idh>=0.8?'#16a34a':j.idh>=0.7?'#65a30d':j.idh>=0.55?'#d97706':'#dc2626';
+    ctx.push(`<div class="kv"><span>Indice de développement humain</span><b style="color:${c}">${j.idh}</b></div>`);
+  }
+  if(j.pib_par_habitant!=null) ctx.push(`<div class="kv"><span>PIB par habitant</span><b>${fmt(j.pib_par_habitant)} $</b></div>`);
+  if(j.taux_urbanisation!=null) ctx.push(`<div class="kv"><span>Taux d'urbanisation</span><b>${j.taux_urbanisation} %</b></div>`);
+  if(j.indice_liberte_religion!=null) ctx.push(`<div class="kv"><span>Liberté religieuse</span><b>${esc(j.indice_liberte_religion)}</b></div>`);
+  if(j.score_persecution!=null){
+    const s = j.score_persecution;
+    const c = s===0?'#16a34a':s<=25?'#65a30d':s<=50?'#d97706':'#dc2626';
+    ctx.push(`<div class="kv"><span>Score de persécution</span><b style="color:${c}">${s}/100</b></div>`);
+  }
+  if(ctx.length || j.contexte_liberte || (j.defis_liberte||[]).length){
+    h += `<div class="sec"><h3>Contexte du pays</h3>`;
+    if(ctx.length) h += ctx.join('');
+    if(j.contexte_liberte) h += `<div class="ctx" style="margin-top:8px">${esc(j.contexte_liberte)}</div>`;
+    if((j.defis_liberte||[]).length)
+      h += `<div style="margin-top:8px">${j.defis_liberte.map(x=>`<span class="pill">${esc(x)}</span>`).join('')}</div>`;
+    h += `</div>`;
+  }
+
+  /* pistes & questions */
+  if((j.pistes||[]).length)
+    h += `<div class="sec"><h3>Pistes pastorales</h3><ul class="pistes">${j.pistes.map(p=>`<li>${md(p)}</li>`).join('')}</ul></div>`;
+  if((j.questions||[]).length)
+    h += `<div class="sec"><h3>Questions de discernement</h3><ul class="quests">${j.questions.map(p=>`<li>❝ ${md(p)} ❞</li>`).join('')}</ul></div>`;
+
+  /* pied */
+  h += `<div class="foot">
+    Source : ${esc(j.source||'GCatholic.org')}${j.derniere_mise_a_jour?` · mise à jour ${esc(j.derniere_mise_a_jour)}`:''}
+    ${j.code_gcatholic?`<br><a href="https://gcatholic.org/dioceses/diocese/${esc(j.code_gcatholic)}.htm" target="_blank" rel="noopener">Voir la fiche sur GCatholic ↗</a>`:''}
+    <br>Rapport servi en direct par l'API Carta Pastorale v2.3.0
+  </div>`;
+
+  pbody.innerHTML = h;
+}
+
+/* --- graphique d'évolution : 3 séries indexées base 100 --- */
+function drawTrend(tend){
+  const W=344, H=170, P={l:8,r:8,t:14,b:22};
+  const years = tend.map(t=>t.annee);
+  const series = [
+    {k:'catholiques', c:'#2563eb', label:'Catholiques'},
+    {k:'pretres',     c:'#dc2626', label:'Prêtres'},
+    {k:'seminaristes',c:'#16a34a', label:'Séminaristes'},
+  ].map(s => {
+    const pts = tend.map(t => t[s.k]).filter(v => v!=null);
+    if(pts.length < 2 || !pts[0]) return null;
+    return {...s, vals: tend.map(t => t[s.k]!=null ? 100*t[s.k]/pts[0] : null),
+            first: pts[0], last: pts[pts.length-1]};
+  }).filter(Boolean);
+  if(!series.length) return '';
+
+  const all = series.flatMap(s=>s.vals).filter(v=>v!=null);
+  const mn = Math.min(...all, 100), mx = Math.max(...all, 100);
+  const pad = (mx-mn)*0.12 || 1;
+  const y = v => P.t + (H-P.t-P.b) * (1 - (v-(mn-pad))/((mx+pad)-(mn-pad)));
+  const x = i => P.l + (W-P.l-P.r) * (years.length>1 ? i/(years.length-1) : 0.5);
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">`;
+  svg += `<line x1="${P.l}" y1="${y(100)}" x2="${W-P.r}" y2="${y(100)}" stroke="#cbd5e1" stroke-dasharray="3 3"/>`;
+  series.forEach(s => {
+    const pts = s.vals.map((v,i)=>v!=null?[x(i),y(v)]:null).filter(Boolean);
+    svg += `<polyline points="${pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')}" fill="none" stroke="${s.c}" stroke-width="2.2" stroke-linejoin="round"/>`;
+    pts.forEach(p => svg += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${s.c}"/>`);
+  });
+  years.forEach((yr,i) => {
+    svg += `<text x="${x(i)}" y="${H-7}" font-size="9.5" fill="#64748b" text-anchor="middle">${yr}</text>`;
+  });
+  svg += `</svg>`;
+  svg += `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;font-size:11px;color:#475569">` +
+    series.map(s=>`<span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${s.c};margin-right:4px"></span>${s.label} <b>${compact(s.first)} → ${compact(s.last)}</b></span>`).join('') +
+    `</div>`;
+  return svg;
+}
+
+/* --- rafraîchissement en arrière-plan depuis l'API --- */
+(async function refreshFromApi(){
+  try{
+    const ctrl = new AbortController();
+    setTimeout(()=>ctrl.abort(), 95000);
+    const r = await fetch(API + '/dioceses', {signal:ctrl.signal, headers: API_HEADERS});
+    if(!r.ok) return;
+    const live = await r.json();
+    setApiStatus(true);
+    if(Array.isArray(live) && live.length !== ALL.length){
+      const byId = Object.fromEntries(live.map(x=>[x.id,x]));
+      ALL.forEach(d => {
+        const l = byId[d.id];
+        if(l){ d.cath = l.catholiques; d.pct = l.pourcentage_catholiques; d.cat = l.categorie||d.cat; }
+      });
+      renderMarkers(curCont);
+      toast('Données actualisées depuis l\'API');
+    }
+  }catch(e){ /* API endormie : les données embarquées restent valides */ }
+})();
+
+/* --- init --- */
+renderMarkers('');
+// lien partageable : index.html#d=fr-pari0 ouvre directement le rapport du diocèse
+const _h = new URLSearchParams(location.hash.slice(1));
+const _d = _h.get('d');
+if(_d && BY_ID[_d]) setTimeout(() => selectDiocese(_d), 500);
+</script>
+
+<script>
+/* --- fenêtre info : À propos / Sources / Confidentialité / Projets --- */
+function openInfo(t){
+  document.getElementById('infoOverlay').classList.add('open');
+  switchInfoTab(t || 'apropos');
+}
+function closeInfo(){
+  document.getElementById('infoOverlay').classList.remove('open');
+}
+function switchInfoTab(t){
+  document.querySelectorAll('#infoTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  document.querySelectorAll('.info-tab').forEach(d => d.style.display = (d.id === 'info-' + t) ? 'block' : 'none');
+}
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeInfo(); });
+</script>
+</body>
+</html>
