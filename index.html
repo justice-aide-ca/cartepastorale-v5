@@ -112,6 +112,42 @@
     #panel{width:100vw}
     #legend{display:none}
   }
+  /* --- bouton info (dans le panneau de contrôle) & fenêtre modale --- */
+  #ctrl .hd{position:relative}
+  #infoBtn{position:absolute;top:11px;right:11px;width:24px;height:24px;border-radius:50%;
+    border:1px solid var(--line);background:#fff;font-size:12px;font-weight:700;color:var(--muted);
+    cursor:pointer;font-family:Georgia,serif;line-height:1;padding:0}
+  #infoBtn:hover{color:var(--blue);border-color:var(--blue);background:#eff6ff}
+  #infoOverlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1400;display:none;
+    align-items:center;justify-content:center;padding:18px}
+  #infoOverlay.open{display:flex}
+  #infoModal{background:#fff;border-radius:16px;max-width:660px;width:100%;max-height:85vh;
+    display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(15,23,42,.3);overflow:hidden}
+  #infoModal .im-head{padding:16px 18px 0;border-bottom:1px solid var(--line);position:relative}
+  #infoModal h2{font-size:17px;margin-bottom:10px;letter-spacing:-.01em}
+  #infoModal .im-close{position:absolute;top:12px;right:14px;border:none;background:#f1f5f9;width:30px;height:30px;
+    border-radius:8px;cursor:pointer;font-size:14px;color:var(--muted)}
+  #infoModal .im-close:hover{background:#e2e8f0}
+  #infoTabs{display:flex;gap:2px;flex-wrap:wrap}
+  #infoTabs button{border:none;background:none;padding:8px 10px;font-size:12.5px;color:var(--muted);
+    cursor:pointer;border-bottom:2px solid transparent;font-weight:600;font-family:inherit}
+  #infoTabs button.on{color:var(--blue);border-bottom-color:var(--blue)}
+  #infoBody{padding:16px 20px 22px;overflow-y:auto;font-size:13px;line-height:1.6;color:#334155}
+  #infoBody h4{font-size:12.5px;margin:14px 0 6px;color:var(--ink)}
+  #infoBody ul{margin:6px 0 6px 18px}
+  #infoBody li{margin-bottom:4px}
+  .src-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--bg)}
+  .src-card b{font-size:12.5px}
+  .src-card p{font-size:12px;color:var(--muted);margin:2px 0 4px}
+  .src-card a{color:var(--blue);font-size:12px;text-decoration:none;font-weight:600}
+  .src-card a:hover{text-decoration:underline}
+  .proj-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .proj-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg)}
+  .proj-card b{font-size:12.5px;display:block;margin-bottom:2px}
+  .proj-card p{font-size:11.5px;color:var(--muted);margin-bottom:5px}
+  .proj-card a{font-size:11.5px;color:var(--blue);text-decoration:none;font-weight:600}
+  .proj-card a.soon{color:var(--gray);pointer-events:none}
+  @media(max-width:640px){.proj-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -121,6 +157,7 @@
   <div class="hd">
     <h1>Carta <span>Pastorale</span> 🗺️</h1>
     <div class="sub">Carte mondiale des diocèses — rapports pastoraux en direct de l'API</div>
+    <button id="infoBtn" title="À propos, sources, confidentialité" onclick="openInfo('apropos')">i</button>
   </div>
   <div id="searchbox">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
@@ -148,6 +185,88 @@
   </div>
   <div id="pbody"></div>
 </aside>
+
+<div id="infoOverlay" onclick="if(event.target===this)closeInfo()">
+  <div id="infoModal">
+    <div class="im-head">
+      <button class="im-close" onclick="closeInfo()" title="Fermer">✕</button>
+      <h2>Carta Pastorale 🗺️</h2>
+      <div id="infoTabs">
+        <button data-t="apropos" class="on" onclick="switchInfoTab('apropos')">À propos</button>
+        <button data-t="sources" onclick="switchInfoTab('sources')">Sources</button>
+        <button data-t="conf" onclick="switchInfoTab('conf')">Confidentialité</button>
+        <button data-t="projets" onclick="switchInfoTab('projets')">Autres projets</button>
+      </div>
+    </div>
+    <div id="infoBody">
+
+      <div class="info-tab" id="info-apropos">
+        <p>Carte mondiale des <b>3 220 circonscriptions ecclésiales catholiques</b> (diocèses, archidiocèses, missions, prélatures…). Cliquez sur un point pour obtenir son <b>rapport pastoral complet</b>, généré en direct par l'API Carta Pastorale : statistiques, évolution, indicateurs, contexte du pays, pistes de discernement.</p>
+        <h4>Cet outil EST</h4>
+        <ul>
+          <li>Une carte de référence des circonscriptions ecclésiales</li>
+          <li>Un support pédagogique pour la formation et le discernement pastoral</li>
+          <li>Basé sur des données publiques et vérifiables (voir onglet Sources)</li>
+          <li>Un projet personnel sans affiliation institutionnelle</li>
+        </ul>
+        <h4>Cet outil N'EST PAS</h4>
+        <ul>
+          <li>Un document officiel du Saint-Siège ni une source juridique canonique</li>
+          <li>Une géolocalisation précise : 250 positions sont <b>approximatives</b> (marqueurs en pointillés, centrées sur le pays)</li>
+          <li>Nécessairement exhaustif : certaines missions récentes peuvent manquer</li>
+        </ul>
+      </div>
+
+      <div class="info-tab" id="info-sources" style="display:none">
+        <div class="src-card"><b>GCatholic.org</b>
+          <p>Source principale : base de données mondiale des structures ecclésiales (catholiques, prêtres, paroisses, historique).</p>
+          <a href="https://gcatholic.org" target="_blank" rel="noopener">gcatholic.org ↗</a></div>
+        <div class="src-card"><b>API Carta Pastorale</b>
+          <p>Rapports pastoraux servis en direct : indicateurs, évolutions, contexte pays (IDH, PIB, liberté religieuse).</p>
+          <a href="https://carta-pastorale.onrender.com" target="_blank" rel="noopener">carta-pastorale.onrender.com ↗</a></div>
+        <div class="src-card"><b>Catholic-Hierarchy.org</b>
+          <p>Répertoire indépendant des diocèses et évêques, maintenu par David M. Cheney.</p>
+          <a href="https://www.catholic-hierarchy.org" target="_blank" rel="noopener">catholic-hierarchy.org ↗</a></div>
+        <div class="src-card"><b>Annuario Pontificio &amp; Annus Statisticus Ecclesiae</b>
+          <p>Annuaire officiel du Saint-Siège et recueil statistique annuel (Librairie Éditrice Vaticane).</p></div>
+        <div class="src-card"><b>OpenStreetMap &amp; Leaflet</b>
+          <p>Fond de carte libre © contributeurs OpenStreetMap (ODbL) · moteur de carte open-source Leaflet.</p>
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">openstreetmap.org/copyright ↗</a> &nbsp;
+          <a href="https://leafletjs.com" target="_blank" rel="noopener">leafletjs.com ↗</a></div>
+      </div>
+
+      <div class="info-tab" id="info-conf" style="display:none">
+        <ul>
+          <li><b>Aucun cookie</b>, aucun traceur, aucun compte utilisateur.</li>
+          <li><b>Aucune donnée personnelle</b> n'est collectée, stockée ou revendue — rien n'est enregistré sur votre appareil.</li>
+          <li>La <b>recherche</b> s'effectue localement, dans votre navigateur.</li>
+          <li>Le clic sur une fiche interroge l'API (carta-pastorale.onrender.com) : comme pour toute visite web, ce serveur peut journaliser une adresse IP technique, sans profilage.</li>
+          <li>Votre <b>position géographique n'est jamais demandée</b>.</li>
+          <li>Le <b>code source est lisible</b> : clic droit → « Afficher le code source de la page ».</li>
+        </ul>
+      </div>
+
+      <div class="info-tab" id="info-projets" style="display:none">
+        <p style="margin-bottom:10px">Outils complémentaires pour l'étude et la pastorale :</p>
+        <div class="proj-grid">
+          <div class="proj-card"><b>📖 Lexique Canonique</b>
+            <p>Dictionnaire interactif des termes du droit canonique (CIC 1983).</p>
+            <a href="#" class="soon">Lien à venir</a></div>
+          <div class="proj-card"><b>👥 Annuaire des Conférences</b>
+            <p>Registre des épiscopats nationaux avec contacts et statistiques.</p>
+            <a href="#" class="soon">Lien à venir</a></div>
+          <div class="proj-card"><b>📊 Statistiques Ecclesia</b>
+            <p>Visualisation des données statistiques de l'Église dans le monde.</p>
+            <a href="#" class="soon">Lien à venir</a></div>
+          <div class="proj-card"><b>📅 Calendrier Liturgique</b>
+            <p>Calendrier perpétuel : lectures, solennités et fêtes mobiles.</p>
+            <a href="#" class="soon">Lien à venir</a></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
 
 <div id="toast"></div>
 
@@ -543,6 +662,22 @@ renderMarkers('');
 const _h = new URLSearchParams(location.hash.slice(1));
 const _d = _h.get('d');
 if(_d && BY_ID[_d]) setTimeout(() => selectDiocese(_d), 500);
+</script>
+
+<script>
+/* --- fenêtre info : À propos / Sources / Confidentialité / Projets --- */
+function openInfo(t){
+  document.getElementById('infoOverlay').classList.add('open');
+  switchInfoTab(t || 'apropos');
+}
+function closeInfo(){
+  document.getElementById('infoOverlay').classList.remove('open');
+}
+function switchInfoTab(t){
+  document.querySelectorAll('#infoTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  document.querySelectorAll('.info-tab').forEach(d => d.style.display = (d.id === 'info-' + t) ? 'block' : 'none');
+}
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeInfo(); });
 </script>
 </body>
 </html>
