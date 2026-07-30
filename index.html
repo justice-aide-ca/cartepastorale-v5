@@ -156,8 +156,9 @@
 <div id="ctrl">
   <div class="hd">
     <h1>Carta <span>Pastorale</span> 🗺️</h1>
-    <div class="sub">Carte mondiale des diocèses — rapports pastoraux en direct de l'API</div>
+    <div class="sub" id="ctrlSub">Carte mondiale des diocèses — rapports pastoraux en direct de l'API</div>
     <button id="infoBtn" title="À propos, sources, confidentialité" onclick="openInfo('apropos')">i</button>
+    <button id="langBtn" onclick="setLang(LANG==='fr'?'en':'fr')" title="Switch language / Changer de langue">EN</button>
   </div>
   <div id="searchbox">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
@@ -168,13 +169,7 @@
   <div id="statsline"><span id="apiStatus"></span><span id="statsTxt">Chargement…</span></div>
 </div>
 
-<div id="legend">
-  <div class="row"><span class="dot" style="background:#dc2626"></span>Archidiocèse métropolitain</div>
-  <div class="row"><span class="dot" style="background:#f59e0b"></span>Archidiocèse</div>
-  <div class="row"><span class="dot" style="background:#2563eb"></span>Diocèse</div>
-  <div class="row"><span class="dot" style="background:#0d9488"></span>Autre juridiction</div>
-  <div class="row"><span class="dot approx" style="background:#2563eb"></span>Position approximative</div>
-</div>
+<div id="legend"></div>
 
 <aside id="panel">
   <div class="ph">
@@ -277,7 +272,263 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="data.js"></script>
 <script>
-/* ============ Carta Pastorale — carte v6 connectée à l'API ============ */
+/* ============ Carta Pastorale — carte v6 bilingue FR/EN connectée à l'API ============ */
+/* ================= BILINGUE FR/EN ================= */
+let LANG = localStorage.getItem('cp_lang') || (((navigator.language||'fr').toLowerCase().startsWith('en')) ? 'en' : 'fr');
+let lastDetail = null;
+
+const I18N = {
+  fr: {
+    title:'Carta Pastorale — Carte mondiale des diocèses',
+    subtitle:"Carte mondiale des diocèses — rapports pastoraux en direct de l'API",
+    searchPh:'Rechercher votre diocèse… (ex : Lyon, Kinshasa, Boston)',
+    infoTitle:'À propos, sources, confidentialité', closeTitle:'Fermer',
+    tabs:{apropos:'À propos',sources:'Sources',conf:'Confidentialité',projets:'Autres projets'},
+    conts:{Tous:'Tous',Afrique:'Afrique','Amérique du Nord':'Amérique du Nord','Amérique latine':'Amérique latine',Asie:'Asie',Europe:'Europe','Océanie':'Océanie',Autre:'Autre'},
+    legend:[['#dc2626','Archidiocèse métropolitain',0],['#f59e0b','Archidiocèse',0],['#2563eb','Diocèse',0],['#0d9488','Autre juridiction',0],['#2563eb','Position approximative',1]],
+    stats:(s,e,t)=>`${s.toLocaleString('fr-FR')} diocèses affichés · ${e.toLocaleString('fr-FR')} positions exactes / ${t.toLocaleString('fr-FR')}`,
+    approx:'position approximative', noPos:'sans position',
+    noPosToast:n=>`« ${n} » : position non disponible — rapport affiché`,
+    loading:'Chargement du rapport pastoral…',
+    wake:'(le serveur peut mettre ~1 min à se réveiller — ',
+    errApi:"⚠️ Impossible de joindre l'API pour le moment.", retry:'Réessayer',
+    offlineData:'Données hors ligne', refreshed:"Données actualisées depuis l'API",
+    offlineMap:'Fond de carte hors ligne activé',
+    secKeys:'Chiffres clés', secTrend:'Évolution (indice base 100)', secInd:'Indicateurs pastoraux',
+    secCtx:'Contexte du pays', secPistes:'Pistes pastorales', secQuest:'Questions de discernement',
+    L:{cath:'Catholiques',pcath:'% catholiques',pop:'Population',sup:'Superficie',pretres:'Prêtres',
+       paroisses:'Paroisses',pdio:'Prêtres diocésains',prel:'Prêtres religieux',religieuses:'Religieuses',
+       diacres:'Diacres perm.',categorie:'Catégorie',
+       idh:'Indice de développement humain',pib:'PIB par habitant',urb:"Taux d'urbanisation",
+       lib:'Liberté religieuse',pers:'Score de persécution'},
+    refMonde:'réf. monde', dataYear:y=>`données ${y}`,
+    src:'Source', maj:'mise à jour', gcath:'Voir la fiche sur GCatholic ↗',
+    served:'Rapport servi en direct par l\'API Carta Pastorale v2.3.0',
+    trend:{catholiques:'Catholiques',pretres:'Prêtres',seminaristes:'Séminaristes'}
+  },
+  en: {
+    title:'Carta Pastorale — World map of Catholic dioceses',
+    subtitle:'World map of Catholic dioceses — pastoral reports live from the API',
+    searchPh:'Find your diocese… (e.g. Lyon, Kinshasa, Boston)',
+    infoTitle:'About, sources, privacy', closeTitle:'Close',
+    tabs:{apropos:'About',sources:'Sources',conf:'Privacy',projets:'Other projects'},
+    conts:{Tous:'All',Afrique:'Africa','Amérique du Nord':'North America','Amérique latine':'Latin America',Asie:'Asia',Europe:'Europe','Océanie':'Oceania',Autre:'Other'},
+    legend:[['#dc2626','Metropolitan archdiocese',0],['#f59e0b','Archdiocese',0],['#2563eb','Diocese',0],['#0d9488','Other jurisdiction',0],['#2563eb','Approximate position',1]],
+    stats:(s,e,t)=>`${s.toLocaleString('en-US')} dioceses shown · ${e.toLocaleString('en-US')} exact positions / ${t.toLocaleString('en-US')}`,
+    approx:'approximate position', noPos:'no position',
+    noPosToast:n=>`"${n}": position not available — showing report`,
+    loading:'Loading pastoral report…',
+    wake:'(the server may take ~1 min to wake up — ',
+    errApi:'⚠️ Unable to reach the API right now.', retry:'Retry',
+    offlineData:'Offline data', refreshed:'Data refreshed from the API',
+    offlineMap:'Offline basemap enabled',
+    secKeys:'Key figures', secTrend:'Trend (index, base 100)', secInd:'Pastoral indicators',
+    secCtx:'Country context', secPistes:'Pastoral pathways', secQuest:'Discernment questions',
+    L:{cath:'Catholics',pcath:'% Catholic',pop:'Population',sup:'Area',pretres:'Priests',
+       paroisses:'Parishes',pdio:'Diocesan priests',prel:'Religious priests',religieuses:'Religious sisters',
+       diacres:'Perm. deacons',categorie:'Category',
+       idh:'Human Development Index',pib:'GDP per capita',urb:'Urbanization rate',
+       lib:'Religious freedom',pers:'Persecution score'},
+    refMonde:'world reference', dataYear:y=>`${y} data`,
+    src:'Source', maj:'updated', gcath:'View record on GCatholic ↗',
+    served:'Report served live by the Carta Pastorale API v2.3.0',
+    trend:{catholiques:'Catholics',pretres:'Priests',seminaristes:'Seminarians'}
+  }
+};
+const T = () => I18N[LANG];
+const LOC = () => LANG==='en' ? 'en-US' : 'fr-FR';
+
+/* --- traduction des textes générés par l'API --- */
+const TR_CAT = {'archidiocèse métropolitain':'Metropolitan archdiocese','archidiocèse':'Archdiocese',
+  'diocèse':'Diocese','administration apostolique':'Apostolic administration','autre':'Other jurisdiction','inconnu':'Unknown'};
+const TR_CONT = {'Afrique':'Africa','Amérique du Nord':'North America','Amérique latine':'Latin America',
+  'Asie':'Asia','Europe':'Europe','Océanie':'Oceania','Autre':'Other','Inconnu':'Unknown','Amerique':'Latin America','Amérique':'Latin America','Amérique du Sud':'Latin America','Oceanie':'Oceania'};
+const TR_IND = {'Catholiques par prêtre':'Catholics per priest','Catholiques par paroisse':'Catholics per parish',
+  'Pourcentage de catholiques':'Percentage of Catholics','Taux de vocations':'Vocations rate'};
+const TR_UNITE = {'cath./prêtre':'cath./priest','cath./paroisse':'cath./parish'};
+const TR_INTERP_EXACT = {
+  'Catholicisme majoritaire. Enjeu : évangélisation des marginaux et nouvelles formes de sécularisation.':'Majority Catholic context. Challenge: evangelizing the margins and facing new forms of secularization.',
+  'Catholicisme minoritaire. Enjeu : nouvelle évangélisation et témoignage crédible.':'Minority Catholic context. Challenge: new evangelization and credible witness.',
+  'Charge pastorale moyenne.':'Average pastoral load.',
+  'Dynamique vocationnelle saine.':'Healthy vocational momentum.',
+  'Dynamique vocationnelle à renforcer.':'Vocational momentum to be strengthened.',
+  'Paroisses surchargées. Réflexion sur de nouvelles unités pastorales.':'Parishes are overstretched. Consider creating new pastoral units.',
+  'Territoire étendu. Enjeu : moyens de transport et prêtres itinérants.':'Vast territory. Challenge: means of transport and itinerant priests.'
+};
+const TR_PISTE = {
+  '**Catholicisme majoritaire** : Comment éviter la routine et raviver la foi des baptisés ? Comment évangéliser les marginaux et les sans-religion ?':'**Majority Catholic context**: How to avoid routine and rekindle the faith of the baptized? How to evangelize the marginalized and the non-religious?',
+  "**Créer de nouvelles unités pastorales** : Les paroisses sont surchargées. Réfléchir à la création de communautés ecclésiales de base animées par des laïcs formés.":'**Create new pastoral units**: Parishes are overstretched. Consider basic ecclesial communities led by trained lay people.',
+  '**Données pastorales** : Les rapports détaillés avec pistes missionnaires nécessitent une analyse approfondie des données locales.':'**Pastoral data**: Detailed reports with missionary pathways require in-depth analysis of local data.',
+  '**Nouvelle évangélisation** : Dans un contexte de catholicisme minoritaire, comment témoigner de la foi de manière crédible et respectueuse ?':'**New evangelization**: In a minority Catholic context, how can we bear credible and respectful witness to the faith?',
+  '**Renforcer la présence des laïcs** : Avec un ratio élevé de catholiques par prêtre, la structuration des communautés ecclésiales de base et la formation des catéchistes deviennent prioritaires.':'**Strengthen lay presence**: With a high Catholics-per-priest ratio, structuring basic ecclesial communities and training catechists becomes a priority.'
+};
+const TR_QUESTION = {
+  "Comment les paroisses peuvent-elles devenir des 'maisons d'accueil' pour les personnes en quête de sens ?":"How can parishes become 'houses of welcome' for people searching for meaning?",
+  "Comment structurer des 'mini-paroisses' animées par des laïcs formés dans les zones où un prêtre ne peut passer qu'une fois par mois ?":"How can we structure 'mini-parishes' led by trained lay people in areas a priest can only visit once a month?",
+  'Comment témoigner de la foi dans un contexte où les catholiques sont une petite minorité ?':'How can we witness to the faith in a context where Catholics are a small minority?',
+  'Quelles sont les priorités pastorales pour ce diocèse dans les 5 prochaines années ?':"What are this diocese's pastoral priorities for the next 5 years?"
+};
+const TR_DEFI = {
+  'Abandon de la pratique religieuse':'Decline in religious practice','Arrestations de chrétiens':'Arrests of Christians',
+  'Athéisme majoritaire':'Majority atheism','Attaques contre les chrétiens':'Attacks on Christians',
+  'Attentats contre les églises':'Attacks on churches','Baisse des vocations sacerdotales':'Decline in priestly vocations',
+  'Catholicisme marginal':'Marginal Catholicism','Catholicisme minoritaire':'Minority Catholicism',
+  'Catholicisme quasi invisible':'Almost invisible Catholicism','Concurrence des églises protestantes':'Competition from Protestant churches',
+  'Conflit armé':'Armed conflict','Conflit dans le sud (Mindanao)':'Conflict in the south (Mindanao)',
+  'Conflits armés et insécurité':'Armed conflicts and insecurity','Contexte socio-économique à analyser':'Socio-economic context to be analyzed',
+  'Corruption':'Corruption','Criminalité':'Crime','Crise anglophone':'Anglophone crisis',
+  'Crise humanitaire et exode':'Humanitarian crisis and exodus','Crise politique':'Political crisis',
+  'Crise économique et pauvreté':'Economic crisis and poverty','Croissance des églises évangéliques':'Growth of evangelical churches',
+  'Croissance démographique':'Population growth','Culte clandestin':'Clandestine worship',
+  'Destruction des églises':'Destruction of churches','Diminution des pratiquants':'Decline in churchgoers',
+  'Discrimination légale':'Legal discrimination','Discrimination systémique':'Systemic discrimination',
+  'Divisions ethniques':'Ethnic divisions','Données locales à compléter':'Local data to be completed',
+  'Déclin des pratiquants':'Decline in churchgoers','Déclin des vocations':'Decline in vocations',
+  'Déclin du catholicisme':'Decline of Catholicism','Déclin du catholicisme québécois':'Decline of Quebec Catholicism',
+  'Déplacements massifs de population':'Mass population displacement','Déplacés et réfugiés':'Displaced people and refugees',
+  'Déplacés internes':'Internally displaced people','Développement des infrastructures':'Infrastructure development',
+  'Développement économique':'Economic development','Exode des chrétiens':'Exodus of Christians',
+  'Gestion du patrimoine religieux':'Religious heritage management','Guerre civile':'Civil war',
+  'Immigration catholique latino-américaine':'Latin American Catholic immigration','Immigration et diversité':'Immigration and diversity',
+  'Immigration haïtienne':'Haitian immigration','Instabilité politique':'Political instability',
+  'Interdiction de conversion':'Ban on conversion',"Interdiction de l'évangélisation":'Ban on evangelization',
+  "Interdiction totale de l'évangélisation":'Total ban on evangelization','Inégalités':'Inequalities',
+  'Inégalités sociales massives':'Massive social inequalities','Islam radical dans certaines zones':'Radical Islam in some areas',
+  'Kidnappings de prêtres et religieux':'Kidnappings of priests and religious','Lois anti-conversion':'Anti-conversion laws',
+  "Maintien de l'identité catholique":'Preserving Catholic identity','Maintien du lien avec les jeunes générations':'Keeping the bond with younger generations',
+  'Nationalisme':'Nationalism','Nationalisme hindou et persécution':'Hindu nationalism and persecution',
+  'Nouvelle évangélisation':'New evangelization','Nouvelle évangélisation des jeunes':'New evangelization of young people',
+  'Pauvreté et sous-développement':'Poverty and underdevelopment','Pauvreté extrême':'Extreme poverty',
+  'Pauvreté rurale':'Rural poverty','Persécution politique':'Political persecution',
+  'Persécution systémique':'Systemic persecution','Persécution violente dans le nord':'Violent persecution in the north',
+  'Perte massive de fidèles vers les évangéliques':'Massive loss of faithful to evangelical churches','Pluralisme religieux':'Religious pluralism',
+  'Polarisation politique et religieuse':'Political and religious polarization','Pressions politiques':'Political pressure',
+  'Pénurie de ressources':'Resource shortage','Pénuries de prêtres en zone rurale':'Priest shortages in rural areas',
+  "Restrictions de construction d'églises":'Restrictions on church construction',"Restrictions sur l'usage du mot 'Allah'":"Restrictions on the use of the word 'Allah'",
+  'Restrictions sur la société civile':'Restrictions on civil society','Risque de mort pour conversion':'Death penalty risk for conversion',
+  "Rôle de l'Église dans la société":"Role of the Church in society",'Scandales et confiance':'Scandals and trust',
+  'Surveillance numérique':'Digital surveillance','Sécularisation':'Secularization',
+  'Sécularisation avancée':'Advanced secularization','Sécularisation croissante':'Growing secularization',
+  'Sécularisation des jeunes':'Secularization of young people','Sécularisation généralisée':'Widespread secularization',
+  'Sécularisation massive':'Massive secularization','Sécularisation progressive':'Gradual secularization',
+  'Sécularisation urbaine':'Urban secularization','Tensions dans les communautés indigènes':'Tensions in indigenous communities',
+  'Vieillissement de la population':'Aging population','Vieillissement des prêtres':'Aging clergy',
+  'Vieillissement rapide':'Rapid aging','Violence dans les zones rurales':'Violence in rural areas',
+  'Violence liée au narcotrafic':'Drug-trafficking violence','Violences tribales':'Tribal violence',
+  'Église patriotique vs souterraine':'Patriotic church vs underground church','Évangéliques en croissance':'Growing evangelical movements',
+  'Évangélisation des jeunes':'Evangelization of young people'
+};
+
+function trInterp(s){
+  if(LANG!=='en' || !s) return s;
+  if(TR_INTERP_EXACT[s]) return TR_INTERP_EXACT[s];
+  let m = s.match(/^Un prêtre pour ([\d\s.,]+) catholiques\. Ratio favorable, richesse pastorale à partager\./);
+  if(m) return `One priest for ${m[1]} Catholics. Favourable ratio — pastoral wealth to share.`;
+  m = s.match(/^Un prêtre pour ([\d\s.,]+) catholiques\. Ratio élevé, renforcer les laïcs\./);
+  if(m) return `One priest for ${m[1]} Catholics. High ratio — strengthen lay ministry.`;
+  return s;
+}
+const trD = (dict, s) => (LANG==='en' && dict[s]) ? dict[s] : s;
+const trCat = s => trD(TR_CAT, s);
+const trCont = s => trD(TR_CONT, s);
+const trInd = s => trD(TR_IND, s);
+const trUnite = s => trD(TR_UNITE, s);
+const trPiste = s => trD(TR_PISTE, s);
+const trQuest = s => trD(TR_QUESTION, s);
+const trDefi = s => trD(TR_DEFI, s);
+
+/* --- contenu anglais de la fenêtre d'information --- */
+const INFO_EN = {
+ 'info-apropos':`<p>World map of <b>3,220 Catholic ecclesiastical circumscriptions</b> (dioceses, archdioceses, missions, prelatures…). Click a point to open its <b>full pastoral report</b>, generated live by the Carta Pastorale API: statistics, trends, indicators, country context, discernment pathways.</p>
+   <h4>This tool IS</h4>
+   <ul><li>A reference map of ecclesiastical circumscriptions</li>
+   <li>An educational support for training and pastoral discernment</li>
+   <li>Based on public, verifiable data (see the Sources tab)</li>
+   <li>A personal project with no institutional affiliation</li></ul>
+   <h4>This tool IS NOT</h4>
+   <ul><li>An official document of the Holy See, nor a source of canon law</li>
+   <li>Precise geolocation: about 240 positions are <b>approximate</b> (dashed markers, centered on the country)</li>
+   <li>Necessarily exhaustive: some recent missions may be missing</li></ul>`,
+ 'info-sources':`<div class="src-card"><b>GCatholic.org</b>
+   <p>Primary source: worldwide database of ecclesiastical structures (Catholics, priests, parishes, history).</p>
+   <a href="https://gcatholic.org" target="_blank" rel="noopener">gcatholic.org ↗</a></div>
+   <div class="src-card"><b>Carta Pastorale API</b>
+   <p>Pastoral reports served live: indicators, trends, country context (HDI, GDP, religious freedom).</p>
+   <a href="https://carta-pastorale.onrender.com" target="_blank" rel="noopener">carta-pastorale.onrender.com ↗</a></div>
+   <div class="src-card"><b>Catholic-Hierarchy.org</b>
+   <p>Independent directory of dioceses and bishops, maintained by David M. Cheney.</p>
+   <a href="https://www.catholic-hierarchy.org" target="_blank" rel="noopener">catholic-hierarchy.org ↗</a></div>
+   <div class="src-card"><b>Annuario Pontificio &amp; Annus Statisticus Ecclesiae</b>
+   <p>Official yearbook of the Holy See and annual statistical compendium (Libreria Editrice Vaticana).</p></div>
+   <div class="src-card"><b>OpenStreetMap &amp; Leaflet</b>
+   <p>Open basemap © OpenStreetMap contributors (ODbL) · open-source Leaflet map engine.</p>
+   <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">openstreetmap.org/copyright ↗</a> &nbsp;
+   <a href="https://leafletjs.com" target="_blank" rel="noopener">leafletjs.com ↗</a></div>`,
+ 'info-conf':`<ul>
+   <li><b>No cookies</b>, no trackers, no user accounts.</li>
+   <li><b>No personal data</b> is collected, stored or sold — only your language preference is remembered on your device.</li>
+   <li><b>Search</b> runs locally, in your browser.</li>
+   <li>Clicking a record queries the API (carta-pastorale.onrender.com): as with any web visit, that server may log a technical IP address, without profiling.</li>
+   <li>Your <b>geolocation is never requested</b>.</li>
+   <li>The <b>source code is readable</b>: right-click → "View page source".</li></ul>`,
+ 'info-projets':`<div class="verse">"Love and faithfulness meet together, righteousness and peace kiss each other."
+   <span>— Psalm 85:10 · the thread connecting these four projects</span></div>
+   <div class="proj-grid">
+   <div class="proj-card"><b>🧭 Le Bon Alignement</b>
+     <span class="vtag">"Love and faithfulness meet"</span>
+     <p>Free, 100% confidential ethical discernment tool: name what is at stake in your choices.</p>
+     <a href="https://lebon-juste-alignement.netlify.app/" target="_blank" rel="noopener">Visit ↗</a></div>
+   <div class="proj-card"><b>🏠 Au Foyer de l'Amour</b>
+     <span class="vtag">"Righteousness and peace kiss"</span>
+     <p>Spiritual discernment and "little light": texts to meditate, prayers, Ignatian exercises, listening.</p>
+     <a href="https://amour-et-verite-app.netlify.app/" target="_blank" rel="noopener">Visit ↗</a></div>
+   <div class="proj-card"><b>⚖️ Justice AI</b>
+     <p>AI-powered, anonymous and free legal guidance: understand your rights, for educational purposes.</p>
+     <a href="https://justice-ai-anonyme-2.onrender.com/" target="_blank" rel="noopener">Visit ↗</a></div>
+   <div class="proj-card"><b>🌉 ONBRIDGE AI</b>
+     <p>A bridge between your projects and artificial intelligence.</p>
+     <a href="https://bridge-your-project.lovable.app/" target="_blank" rel="noopener">Visit ↗</a></div>
+   </div>`
+};
+let INFO_FR = null;
+
+function setLang(l){
+  LANG = l;
+  try{ localStorage.setItem('cp_lang', l); }catch(e){}
+  applyLang();
+}
+function renderLegend(){
+  document.getElementById('legend').innerHTML = T().legend.map(([c,txt,ap]) =>
+    `<div class="row"><span class="dot${ap?' approx':''}" style="background:${c}"></span>${txt}</div>`).join('');
+}
+function renderInfoModal(){
+  if(!INFO_FR){
+    INFO_FR = {};
+    document.querySelectorAll('.info-tab').forEach(d => INFO_FR[d.id] = d.innerHTML);
+  }
+  const src = LANG==='en' ? INFO_EN : INFO_FR;
+  for(const id in src){
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = src[id];
+  }
+  document.querySelectorAll('#infoTabs button').forEach(b => b.textContent = T().tabs[b.dataset.t] || b.textContent);
+}
+function applyLang(){
+  const t = T();
+  document.documentElement.lang = LANG;
+  document.title = t.title;
+  document.getElementById('ctrlSub').textContent = t.subtitle;
+  document.getElementById('q').placeholder = t.searchPh;
+  document.getElementById('infoBtn').title = t.infoTitle;
+  document.getElementById('close').title = t.closeTitle;
+  document.getElementById('langBtn').textContent = LANG==='fr' ? 'EN' : 'FR';
+  buildChips();
+  renderLegend();
+  renderInfoModal();
+  renderMarkers(curCont);
+  if(lastDetail) renderDetail(lastDetail.j, lastDetail.d);
+}
+
 const API = 'https://carta-pastorale.onrender.com';
 const API_KEY = ''; // ← collez votre clé API ici si un jour l'API la demande (envoyée en en-tête X-API-Key)
 const API_HEADERS = API_KEY ? {'X-API-Key': API_KEY} : {};
@@ -287,9 +538,10 @@ const ALL = DIOCESES.map(r => ({id:r[0], nom:r[1], pays:r[2], cont:r[3], cat:r[4
                                 cath:r[5], pct:r[6], lat:r[7], lng:r[8], exact:r[9]===1}));
 const BY_ID = Object.fromEntries(ALL.map(d => [d.id, d]));
 const norm = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
-const fmt = n => (n==null ? '—' : n.toLocaleString('fr-FR'));
-const compact = n => n==null ? '—' : (Math.abs(n)>=1e6 ? (n/1e6).toFixed(2).replace('.',',')+' M'
-                                      : n.toLocaleString('fr-FR'));
+const fmt = n => (n==null ? '—' : n.toLocaleString(LOC()));
+const compact = n => n==null ? '—' : (Math.abs(n)>=1e6 ? (n/1e6).toLocaleString(LOC(),{minimumFractionDigits:2,maximumFractionDigits:2})+' M'
+                                      : n.toLocaleString(LOC()));
+const fmtPct = n => n==null ? '—' : n.toLocaleString(LOC(),{minimumFractionDigits:0,maximumFractionDigits:1});
 const esc = s => String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const md = s => esc(s).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
 
@@ -317,7 +569,7 @@ setTimeout(() => {
     map.removeLayer(osm);
     addContinents();
     L.control.attribution({prefix:false}).addAttribution('données : API Carta Pastorale (GCatholic)').addTo(map);
-    toast('Fond de carte hors ligne activé');
+    toast(T().offlineMap);
   }
 }, 8000);
 
@@ -393,7 +645,7 @@ function renderMarkers(cont){
     if(d.lat==null) continue;
     if(cont && d.cont!==cont) continue;
     const m = L.marker([d.lat, d.lng], {icon:iconFor(d), title:d.nom});
-    m.bindTooltip(`<b>${esc(d.nom)}</b> — ${esc(d.pays)}${d.exact?'':'<br><i style="color:#b45309">position approximative</i>'}`,
+    m.bindTooltip(`<b>${esc(d.nom)}</b> — ${esc(d.pays)}${d.exact?'':'<br><i style="color:#b45309">'+T().approx+'</i>'}`,
                   {direction:'top', offset:[0,-6]});
     m.on('click', () => openPanel(d.id));
     MARKERS[d.id] = m;
@@ -405,25 +657,28 @@ function renderMarkers(cont){
 function updateStats(cont){
   const shown = Object.keys(MARKERS).length;
   const exact = ALL.filter(d=>d.exact).length;
-  document.getElementById('statsTxt').textContent =
-    `${shown.toLocaleString('fr-FR')} diocèses affichés · ${exact.toLocaleString('fr-FR')} positions exactes / ${ALL.length.toLocaleString('fr-FR')}`;
+  document.getElementById('statsTxt').textContent = T().stats(shown, exact, ALL.length);
 }
 
 /* --- filtres continent --- */
 const CONTS = ['Tous','Afrique','Amérique du Nord','Amérique latine','Asie','Europe','Océanie','Autre'];
 let curCont = '';
-const chipsEl = document.getElementById('chips');
-for(const c of CONTS){
-  const b = document.createElement('button');
-  b.className = 'chip' + (c==='Tous' ? ' on' : '');
-  b.textContent = c;
-  b.onclick = () => {
-    curCont = (c==='Tous') ? '' : c;
-    chipsEl.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on');
-    renderMarkers(curCont);
-  };
-  chipsEl.appendChild(b);
+function buildChips(){
+  const chipsEl = document.getElementById('chips');
+  chipsEl.innerHTML = '';
+  for(const c of CONTS){
+    const b = document.createElement('button');
+    const isOn = (c==='Tous') ? !curCont : (c===curCont);
+    b.className = 'chip' + (isOn ? ' on' : '');
+    b.textContent = T().conts[c] || c;
+    b.onclick = () => {
+      curCont = (c==='Tous') ? '' : c;
+      chipsEl.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');
+      renderMarkers(curCont);
+    };
+    chipsEl.appendChild(b);
+  }
 }
 
 /* --- recherche --- */
@@ -434,7 +689,7 @@ q.addEventListener('input', () => {
   const hits = ALL.filter(d => norm(d.nom).includes(v) || norm(d.pays).includes(v)).slice(0, 8);
   if(!hits.length){ sugg.style.display='none'; return; }
   sugg.innerHTML = hits.map(d =>
-    `<div class="it" data-id="${d.id}"><span>${esc(d.nom)}${d.lat==null?' <span class="nopos">· sans position</span>':''}</span><span class="pays">${esc(d.pays)}</span></div>`).join('');
+    `<div class="it" data-id="${d.id}"><span>${esc(d.nom)}${d.lat==null?' <span class="nopos">· '+T().noPos+'</span>':''}</span><span class="pays">${esc(d.pays)}</span></div>`).join('');
   sugg.style.display = 'block';
   sugg.querySelectorAll('.it').forEach(el => el.onclick = () => {
     sugg.style.display='none'; q.value = BY_ID[el.dataset.id].nom; selectDiocese(el.dataset.id);
@@ -458,7 +713,7 @@ function selectDiocese(id){
     map.flyTo([d.lat, d.lng], 8, {duration:1.1});
     setTimeout(() => { const m = MARKERS[id]; if(m) cluster.zoomToShowLayer(m, () => m.openTooltip()); }, 1200);
   } else {
-    toast(`« ${d.nom} » : position non disponible — rapport affiché`);
+    toast(T().noPosToast(d.nom));
   }
   openPanel(id);
 }
@@ -498,14 +753,15 @@ async function fetchDetail(id, d, attempt){
     const j = await r.json();
     clearInterval(fetchTimer);
     setApiStatus(true);
+    lastDetail = {j, d};
     renderDetail(j, d);
   }catch(err){
     clearTimeout(to);
     if(attempt < 1){ fetchDetail(id, d, attempt+1); return; }
     clearInterval(fetchTimer);
-    pbody.innerHTML = `<div class="err">⚠️ Impossible de joindre l'API pour le moment.<br>
+    pbody.innerHTML = `<div class="err">${T().errApi}<br>
       <span style="font-size:11px">${esc(String(err))}</span><br>
-      <button onclick="openPanel('${id}')">Réessayer</button></div>
+      <button onclick="openPanel('${id}')">${T().retry}</button></div>
       ${summaryFallback(d)}`;
   }
 }
@@ -527,73 +783,76 @@ function summaryFallback(d){
 function card(v, l){ return `<div class="card"><div class="v">${v}</div><div class="l">${l}</div></div>`; }
 
 function renderDetail(j, d){
+  const t = T(), L = t.L;
   document.getElementById('pTitle').textContent = j.nom || d.nom;
-  document.getElementById('pMeta').textContent = `${j.pays_nom || d.pays} · ${j.continent || d.cont}`;
-  document.getElementById('pBadge').textContent = (j.categorie || d.cat) + (j.annee_donnees ? ` · données ${j.annee_donnees}` : '');
+  document.getElementById('pMeta').textContent = LANG==='en'
+    ? `${d.pays} · ${trCont(j.continent || d.cont)}`
+    : `${j.pays_nom || d.pays} · ${j.continent ? trCont(j.continent) : trCont(d.cont)}`;
+  document.getElementById('pBadge').textContent = trCat(j.categorie || d.cat) + (j.annee_donnees ? ` · ${t.dataYear(j.annee_donnees)}` : '');
 
   let h = '';
 
   /* territoire & ressources */
-  const t = j.territoire || {}, r = j.ressources || {};
+  const te = j.territoire || {}, r = j.ressources || {};
   const cards = [];
-  if(t.catholiques!=null)        cards.push(card(compact(t.catholiques),'Catholiques'));
-  if(t.pourcentage_catholiques!=null) cards.push(card(t.pourcentage_catholiques+' %','% catholiques'));
-  if(t.population_totale!=null)  cards.push(card(compact(t.population_totale),'Population'));
-  if(t.superficie_km2!=null)     cards.push(card(compact(t.superficie_km2)+' km²','Superficie'));
-  if(r.total_pretres!=null)      cards.push(card(fmt(r.total_pretres),'Prêtres'));
-  if(r.paroisses!=null)          cards.push(card(fmt(r.paroisses),'Paroisses'));
-  if(r.pretres_diocesains!=null) cards.push(card(fmt(r.pretres_diocesains),'Prêtres diocésains'));
-  if(r.pretres_religieux!=null)  cards.push(card(fmt(r.pretres_religieux),'Prêtres religieux'));
-  if(r.religieuses!=null)        cards.push(card(fmt(r.religieuses),'Religieuses'));
-  if(r.diacres_permanents!=null) cards.push(card(fmt(r.diacres_permanents),'Diacres perm.'));
-  if(cards.length) h += `<div class="sec"><h3>Chiffres clés</h3><div class="cards">${cards.join('')}</div></div>`;
+  if(te.catholiques!=null)        cards.push(card(compact(te.catholiques),L.cath));
+  if(te.pourcentage_catholiques!=null) cards.push(card(fmtPct(te.pourcentage_catholiques)+' %',L.pcath));
+  if(te.population_totale!=null)  cards.push(card(compact(te.population_totale),L.pop));
+  if(te.superficie_km2!=null)     cards.push(card(compact(te.superficie_km2)+' km²',L.sup));
+  if(r.total_pretres!=null)       cards.push(card(fmt(r.total_pretres),L.pretres));
+  if(r.paroisses!=null)           cards.push(card(fmt(r.paroisses),L.paroisses));
+  if(r.pretres_diocesains!=null)  cards.push(card(fmt(r.pretres_diocesains),L.pdio));
+  if(r.pretres_religieux!=null)   cards.push(card(fmt(r.pretres_religieux),L.prel));
+  if(r.religieuses!=null)         cards.push(card(fmt(r.religieuses),L.religieuses));
+  if(r.diacres_permanents!=null)  cards.push(card(fmt(r.diacres_permanents),L.diacres));
+  if(cards.length) h += `<div class="sec"><h3>${t.secKeys}</h3><div class="cards">${cards.join('')}</div></div>`;
 
   /* évolution */
   if(Array.isArray(j.tendances) && j.tendances.length >= 2)
-    h += `<div class="sec"><h3>Évolution (indice base 100)</h3>${drawTrend(j.tendances)}</div>`;
+    h += `<div class="sec"><h3>${t.secTrend}</h3>${drawTrend(j.tendances)}</div>`;
 
   /* indicateurs */
   if(Array.isArray(j.indicateurs) && j.indicateurs.length){
-    h += `<div class="sec"><h3>Indicateurs pastoraux</h3>` + j.indicateurs.map(i =>
-      `<div class="ind"><div class="t"><span>${esc(i.nom)}</span><span class="val">${fmt(i.valeur)} ${esc(i.unite||'')}</span></div>
-       <div class="ref">réf. monde : ${fmt(i.ref_monde)} ${esc(i.unite||'')}</div>
-       <div class="interp">${esc(i.interpretation)}</div></div>`).join('') + `</div>`;
+    h += `<div class="sec"><h3>${t.secInd}</h3>` + j.indicateurs.map(i =>
+      `<div class="ind"><div class="t"><span>${esc(trInd(i.nom))}</span><span class="val">${fmt(i.valeur)} ${esc(trUnite(i.unite||''))}</span></div>
+       <div class="ref">${t.refMonde} : ${fmt(i.ref_monde)} ${esc(trUnite(i.unite||''))}</div>
+       <div class="interp">${esc(trInterp(i.interpretation))}</div></div>`).join('') + `</div>`;
   }
 
   /* contexte pays */
   const ctx = [];
   if(j.idh!=null){
     const c = j.idh>=0.8?'#16a34a':j.idh>=0.7?'#65a30d':j.idh>=0.55?'#d97706':'#dc2626';
-    ctx.push(`<div class="kv"><span>Indice de développement humain</span><b style="color:${c}">${j.idh}</b></div>`);
+    ctx.push(`<div class="kv"><span>${L.idh}</span><b style="color:${c}">${j.idh}</b></div>`);
   }
-  if(j.pib_par_habitant!=null) ctx.push(`<div class="kv"><span>PIB par habitant</span><b>${fmt(j.pib_par_habitant)} $</b></div>`);
-  if(j.taux_urbanisation!=null) ctx.push(`<div class="kv"><span>Taux d'urbanisation</span><b>${j.taux_urbanisation} %</b></div>`);
-  if(j.indice_liberte_religion!=null) ctx.push(`<div class="kv"><span>Liberté religieuse</span><b>${esc(j.indice_liberte_religion)}</b></div>`);
+  if(j.pib_par_habitant!=null) ctx.push(`<div class="kv"><span>${L.pib}</span><b>${fmt(j.pib_par_habitant)} $</b></div>`);
+  if(j.taux_urbanisation!=null) ctx.push(`<div class="kv"><span>${L.urb}</span><b>${j.taux_urbanisation} %</b></div>`);
+  if(j.indice_liberte_religion!=null) ctx.push(`<div class="kv"><span>${L.lib}</span><b>${esc(j.indice_liberte_religion)}</b></div>`);
   if(j.score_persecution!=null){
     const s = j.score_persecution;
     const c = s===0?'#16a34a':s<=25?'#65a30d':s<=50?'#d97706':'#dc2626';
-    ctx.push(`<div class="kv"><span>Score de persécution</span><b style="color:${c}">${s}/100</b></div>`);
+    ctx.push(`<div class="kv"><span>${L.pers}</span><b style="color:${c}">${s}/100</b></div>`);
   }
   if(ctx.length || j.contexte_liberte || (j.defis_liberte||[]).length){
-    h += `<div class="sec"><h3>Contexte du pays</h3>`;
+    h += `<div class="sec"><h3>${t.secCtx}</h3>`;
     if(ctx.length) h += ctx.join('');
     if(j.contexte_liberte) h += `<div class="ctx" style="margin-top:8px">${esc(j.contexte_liberte)}</div>`;
     if((j.defis_liberte||[]).length)
-      h += `<div style="margin-top:8px">${j.defis_liberte.map(x=>`<span class="pill">${esc(x)}</span>`).join('')}</div>`;
+      h += `<div style="margin-top:8px">${j.defis_liberte.map(x=>`<span class="pill">${esc(trDefi(x))}</span>`).join('')}</div>`;
     h += `</div>`;
   }
 
   /* pistes & questions */
   if((j.pistes||[]).length)
-    h += `<div class="sec"><h3>Pistes pastorales</h3><ul class="pistes">${j.pistes.map(p=>`<li>${md(p)}</li>`).join('')}</ul></div>`;
+    h += `<div class="sec"><h3>${t.secPistes}</h3><ul class="pistes">${j.pistes.map(p=>`<li>${md(trPiste(p))}</li>`).join('')}</ul></div>`;
   if((j.questions||[]).length)
-    h += `<div class="sec"><h3>Questions de discernement</h3><ul class="quests">${j.questions.map(p=>`<li>❝ ${md(p)} ❞</li>`).join('')}</ul></div>`;
+    h += `<div class="sec"><h3>${t.secQuest}</h3><ul class="quests">${j.questions.map(p=>`<li>❝ ${md(trQuest(p))} ❞</li>`).join('')}</ul></div>`;
 
   /* pied */
   h += `<div class="foot">
-    Source : ${esc(j.source||'GCatholic.org')}${j.derniere_mise_a_jour?` · mise à jour ${esc(j.derniere_mise_a_jour)}`:''}
-    ${j.code_gcatholic?`<br><a href="https://gcatholic.org/dioceses/diocese/${esc(j.code_gcatholic)}.htm" target="_blank" rel="noopener">Voir la fiche sur GCatholic ↗</a>`:''}
-    <br>Rapport servi en direct par l'API Carta Pastorale v2.3.0
+    ${t.src} : ${esc(j.source||'GCatholic.org')}${j.derniere_mise_a_jour?` · ${t.maj} ${esc(j.derniere_mise_a_jour)}`:''}
+    ${j.code_gcatholic?`<br><a href="https://gcatholic.org/dioceses/diocese/${esc(j.code_gcatholic)}.htm" target="_blank" rel="noopener">${t.gcath}</a>`:''}
+    <br>${t.served}
   </div>`;
 
   pbody.innerHTML = h;
@@ -604,9 +863,9 @@ function drawTrend(tend){
   const W=344, H=170, P={l:8,r:8,t:14,b:22};
   const years = tend.map(t=>t.annee);
   const series = [
-    {k:'catholiques', c:'#2563eb', label:'Catholiques'},
-    {k:'pretres',     c:'#dc2626', label:'Prêtres'},
-    {k:'seminaristes',c:'#16a34a', label:'Séminaristes'},
+    {k:'catholiques', c:'#2563eb', label:T().trend.catholiques},
+    {k:'pretres',     c:'#dc2626', label:T().trend.pretres},
+    {k:'seminaristes',c:'#16a34a', label:T().trend.seminaristes},
   ].map(s => {
     const pts = tend.map(t => t[s.k]).filter(v => v!=null);
     if(pts.length < 2 || !pts[0]) return null;
@@ -654,13 +913,13 @@ function drawTrend(tend){
         if(l){ d.cath = l.catholiques; d.pct = l.pourcentage_catholiques; d.cat = l.categorie||d.cat; }
       });
       renderMarkers(curCont);
-      toast('Données actualisées depuis l\'API');
+      toast(T().refreshed);
     }
   }catch(e){ /* API endormie : les données embarquées restent valides */ }
 })();
 
 /* --- init --- */
-renderMarkers('');
+applyLang();
 // lien partageable : index.html#d=fr-pari0 ouvre directement le rapport du diocèse
 const _h = new URLSearchParams(location.hash.slice(1));
 const _d = _h.get('d');
