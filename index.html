@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carta Pastorale — Carte mondiale des diocèses</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+  :root{
+    --ink:#1e293b; --muted:#64748b; --line:#e2e8f0; --bg:#f8fafc;
+    --blue:#2563eb; --red:#dc2626; --amber:#f59e0b; --teal:#0d9488; --gray:#9ca3af;
+    --panel-w:400px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink)}
+  #map{position:absolute;inset:0;background:#dbeafe}
+  .leaflet-container{font:inherit}
+
+  /* --- panneau de contrôle --- */
+  #ctrl{position:absolute;top:14px;left:14px;z-index:1000;width:330px;max-width:calc(100vw - 28px);
+    background:rgba(255,255,255,.96);backdrop-filter:blur(6px);border-radius:14px;
+    box-shadow:0 8px 30px rgba(15,23,42,.18);border:1px solid var(--line);overflow:hidden}
+  #ctrl .hd{padding:12px 14px 10px;border-bottom:1px solid var(--line)}
+  #ctrl h1{font-size:16px;font-weight:700;letter-spacing:-.01em}
+  #ctrl h1 span{color:var(--blue)}
+  #ctrl .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+  #searchbox{position:relative;padding:10px 12px 6px}
+  #q{width:100%;padding:9px 12px 9px 34px;font-size:13.5px;border:1.5px solid var(--line);border-radius:10px;outline:none;background:#fff}
+  #q:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  #searchbox svg{position:absolute;left:23px;top:21px;width:15px;height:15px;stroke:var(--muted)}
+  #sugg{position:absolute;left:12px;right:12px;top:48px;background:#fff;border:1px solid var(--line);
+    border-radius:10px;box-shadow:0 10px 26px rgba(15,23,42,.16);max-height:290px;overflow:auto;display:none;z-index:20}
+  #sugg .it{padding:8px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+  #sugg .it:hover{background:#eff6ff}
+  #sugg .it .pays{color:var(--muted);font-size:11px;white-space:nowrap}
+  #sugg .it .nopos{font-size:10px;color:#b45309}
+  #chips{display:flex;flex-wrap:wrap;gap:5px;padding:8px 12px 12px}
+  .chip{font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--muted)}
+  .chip:hover{border-color:var(--blue);color:var(--blue)}
+  .chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+  #statsline{padding:7px 14px;font-size:11px;color:var(--muted);border-top:1px solid var(--line);background:var(--bg)}
+
+  /* --- légende --- */
+  #legend{position:absolute;bottom:18px;left:14px;z-index:1000;background:rgba(255,255,255,.94);
+    border:1px solid var(--line);border-radius:12px;padding:9px 12px;font-size:11px;color:var(--muted);
+    box-shadow:0 4px 16px rgba(15,23,42,.12)}
+  #legend .row{display:flex;align-items:center;gap:7px;margin:3px 0}
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:none}
+  .dot.approx{border:2px dashed #fff;box-shadow:0 0 0 1px var(--muted);opacity:.75}
+
+  /* --- marqueurs --- */
+  .mk{border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+  .mk.approx{opacity:.72;border-style:dashed}
+
+  /* --- panneau latéral --- */
+  #panel{position:absolute;top:0;right:0;height:100%;width:var(--panel-w);max-width:100vw;z-index:1100;
+    background:#fff;border-left:1px solid var(--line);box-shadow:-10px 0 34px rgba(15,23,42,.16);
+    transform:translateX(105%);transition:transform .28s ease;display:flex;flex-direction:column}
+  #panel.open{transform:translateX(0)}
+  #panel .ph{padding:16px 18px 12px;border-bottom:1px solid var(--line);position:relative;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff}
+  #panel .ph h2{font-size:18px;font-weight:700;letter-spacing:-.01em;padding-right:30px}
+  #panel .ph .meta{font-size:12px;opacity:.9;margin-top:3px}
+  #panel .ph .badge{display:inline-block;font-size:10.5px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);
+    padding:2px 9px;border-radius:999px;margin-top:7px}
+  #close{position:absolute;top:12px;right:12px;width:28px;height:28px;border:none;border-radius:8px;
+    background:rgba(255,255,255,.18);color:#fff;font-size:15px;cursor:pointer;line-height:1}
+  #close:hover{background:rgba(255,255,255,.32)}
+  #pbody{flex:1;overflow-y:auto;padding:14px 16px 26px}
+  .sec{margin-bottom:18px}
+  .sec h3{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:8px;
+    display:flex;align-items:center;gap:6px}
+  .sec h3::after{content:"";flex:1;height:1px;background:var(--line)}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+  .card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 9px}
+  .card .v{font-size:16px;font-weight:700;letter-spacing:-.02em}
+  .card .l{font-size:10px;color:var(--muted);margin-top:1px}
+  .ind{border-left:3px solid var(--blue);background:var(--bg);border-radius:0 8px 8px 0;padding:8px 10px;margin-bottom:7px}
+  .ind .t{font-size:12.5px;font-weight:600;display:flex;justify-content:space-between;gap:8px}
+  .ind .t .val{color:var(--blue);white-space:nowrap}
+  .ind .ref{font-size:10.5px;color:var(--muted)}
+  .ind .interp{font-size:11.5px;color:#475569;margin-top:3px;line-height:1.45}
+  .pill{display:inline-block;font-size:10.5px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;
+    padding:2px 8px;border-radius:999px;margin:2px 3px 2px 0}
+  .ctx{font-size:12.5px;line-height:1.55;color:#334155;background:var(--bg);border:1px solid var(--line);
+    border-radius:10px;padding:10px 12px}
+  .kv{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 2px;border-bottom:1px dashed var(--line)}
+  .kv:last-child{border-bottom:none}
+  .kv b{font-weight:600}
+  ul.pistes{list-style:none}
+  ul.pistes li{font-size:12.5px;line-height:1.5;padding:7px 10px;background:#f0fdf4;border:1px solid #bbf7d0;
+    border-radius:8px;margin-bottom:6px}
+  ul.quests{list-style:none}
+  ul.quests li{font-size:12.5px;line-height:1.5;padding:7px 10px;background:#eff6ff;border:1px solid #bfdbfe;
+    border-radius:8px;margin-bottom:6px;font-style:italic}
+  .foot{font-size:10.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:9px;margin-top:4px;line-height:1.6}
+  .foot a{color:var(--blue);text-decoration:none}
+  .loading{text-align:center;padding:44px 20px;color:var(--muted);font-size:13px}
+  .spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--blue);border-radius:50%;
+    margin:0 auto 12px;animation:sp 0.9s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:10px;padding:14px;font-size:12.5px;text-align:center}
+  .err button{margin-top:9px;background:var(--blue);color:#fff;border:none;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:12.5px}
+  #toast{position:absolute;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);z-index:1300;
+    background:#1e293b;color:#fff;font-size:12.5px;padding:9px 18px;border-radius:10px;opacity:0;transition:.3s;pointer-events:none}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #apiStatus{display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:5px;vertical-align:1px}
+  #apiStatus.on{background:#16a34a}
+  @media (max-width:640px){
+    #ctrl{width:calc(100vw - 20px);left:10px;top:10px}
+    #panel{width:100vw}
+    #legend{display:none}
+  }
+  /* --- bouton info (dans le panneau de contrôle) & fenêtre modale --- */
+  #ctrl .hd{position:relative}
+  #infoBtn{position:absolute;top:11px;right:11px;width:24px;height:24px;border-radius:50%;
+    border:1px solid var(--line);background:#fff;font-size:12px;font-weight:700;color:var(--muted);
+    cursor:pointer;font-family:Georgia,serif;line-height:1;padding:0}
+  #infoBtn:hover{color:var(--blue);border-color:var(--blue);background:#eff6ff}
+  #infoOverlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1400;display:none;
+    align-items:center;justify-content:center;padding:18px}
+  #infoOverlay.open{display:flex}
+  #infoModal{background:#fff;border-radius:16px;max-width:660px;width:100%;max-height:85vh;
+    display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(15,23,42,.3);overflow:hidden}
+  #infoModal .im-head{padding:16px 18px 0;border-bottom:1px solid var(--line);position:relative}
+  #infoModal h2{font-size:17px;margin-bottom:10px;letter-spacing:-.01em}
+  #infoModal .im-close{position:absolute;top:12px;right:14px;border:none;background:#f1f5f9;width:30px;height:30px;
+    border-radius:8px;cursor:pointer;font-size:14px;color:var(--muted)}
+  #infoModal .im-close:hover{background:#e2e8f0}
+  #infoTabs{display:flex;gap:2px;flex-wrap:wrap}
+  #infoTabs button{border:none;background:none;padding:8px 10px;font-size:12.5px;color:var(--muted);
+    cursor:pointer;border-bottom:2px solid transparent;font-weight:600;font-family:inherit}
+  #infoTabs button.on{color:var(--blue);border-bottom-color:var(--blue)}
+  #infoBody{padding:16px 20px 22px;overflow-y:auto;font-size:13px;line-height:1.6;color:#334155}
+  #infoBody h4{font-size:12.5px;margin:14px 0 6px;color:var(--ink)}
+  #infoBody ul{margin:6px 0 6px 18px}
+  #infoBody li{margin-bottom:4px}
+  .src-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--bg)}
+  .src-card b{font-size:12.5px}
+  .src-card p{font-size:12px;color:var(--muted);margin:2px 0 4px}
+  .src-card a{color:var(--blue);font-size:12px;text-decoration:none;font-weight:600}
+  .src-card a:hover{text-decoration:underline}
+  .proj-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .proj-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg)}
+  .proj-card b{font-size:12.5px;display:block;margin-bottom:2px}
+  .proj-card p{font-size:11.5px;color:var(--muted);margin-bottom:5px}
+  .proj-card a{font-size:11.5px;color:var(--blue);text-decoration:none;font-weight:600}
+  .proj-card a.soon{color:var(--gray);pointer-events:none}
+  @media(max-width:640px){.proj-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="ctrl">
+  <div class="hd">
+    <h1>Carta <span>Pastorale</span> 🗺️</h1>
+    <div class="sub" id="ctrlSub">Carte mondiale des diocèses — rapports pastoraux en direct de l'API</div>
+    <button id="infoBtn" title="À propos, sources, confidentialité" onclick="openInfo('apropos')">i</button>
+    <button id="langBtn" onclick="setLang(LANG==='fr'?'en':'fr')" title="Switch language / Changer de langue">EN</button>
+  </div>
+  <div id="searchbox">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    <input id="q" type="text" placeholder="Rechercher votre diocèse… (ex : Lyon, Kinshasa, Boston)" autocomplete="off">
+    <div id="sugg"></div>
+  </div>
+  <div id="chips"></div>
+  <div id="statsline"><span id="apiStatus"></span><span id="statsTxt">Chargement…</span></div>
+</div>
+
+<div id="legend"></div>
+
+<aside id="panel">
+  <div class="ph">
+    <button id="close" title="Fermer">✕</button>
+    <h2 id="pTitle">…</h2>
+    <div class="meta" id="pMeta"></div>
+    <span class="badge" id="pBadge"></span>
+  </div>
+  <div id="pbody"></div>
+</aside>
+
+<div id="infoOverlay" onclick="if(event.target===this)closeInfo()">
+  <div id="infoModal">
+    <div class="im-head">
+      <button class="im-close" onclick="closeInfo()" title="Fermer">✕</button>
+      <h2>Carta Pastorale 🗺️</h2>
+      <div id="infoTabs">
+        <button data-t="apropos" class="on" onclick="switchInfoTab('apropos')">À propos</button>
+        <button data-t="sources" onclick="switchInfoTab('sources')">Sources</button>
+        <button data-t="conf" onclick="switchInfoTab('conf')">Confidentialité</button>
+        <button data-t="projets" onclick="switchInfoTab('projets')">Autres projets</button>
+      </div>
+    </div>
+    <div id="infoBody">
+
+      <div class="info-tab" id="info-apropos">
+        <p>Carte mondiale des <b>3 220 circonscriptions ecclésiales catholiques</b> (diocèses, archidiocèses, missions, prélatures…). Cliquez sur un point pour obtenir son <b>rapport pastoral complet</b>, généré en direct par l'API Carta Pastorale : statistiques, évolution, indicateurs, contexte du pays, pistes de discernement.</p>
+        <h4>Cet outil EST</h4>
+        <ul>
+          <li>Une carte de référence des circonscriptions ecclésiales</li>
+          <li>Un support pédagogique pour la formation et le discernement pastoral</li>
+          <li>Basé sur des données publiques et vérifiables (voir onglet Sources)</li>
+          <li>Un projet personnel sans affiliation institutionnelle</li>
+        </ul>
+        <h4>Cet outil N'EST PAS</h4>
+        <ul>
+          <li>Un document officiel du Saint-Siège ni une source juridique canonique</li>
+          <li>Une géolocalisation précise : 250 positions sont <b>approximatives</b> (marqueurs en pointillés, centrées sur le pays)</li>
+          <li>Nécessairement exhaustif : certaines missions récentes peuvent manquer</li>
+        </ul>
+      </div>
+
+      <div class="info-tab" id="info-sources" style="display:none">
+        <div class="src-card"><b>GCatholic.org</b>
+          <p>Source principale : base de données mondiale des structures ecclésiales (catholiques, prêtres, paroisses, historique).</p>
+          <a href="https://gcatholic.org" target="_blank" rel="noopener">gcatholic.org ↗</a></div>
+        <div class="src-card"><b>API Carta Pastorale</b>
+          <p>Rapports pastoraux servis en direct : indicateurs, évolutions, contexte pays (IDH, PIB, liberté religieuse).</p>
+          <a href="https://carta-pastorale.onrender.com" target="_blank" rel="noopener">carta-pastorale.onrender.com ↗</a></div>
+        <div class="src-card"><b>Catholic-Hierarchy.org</b>
+          <p>Répertoire indépendant des diocèses et évêques, maintenu par David M. Cheney.</p>
+          <a href="https://www.catholic-hierarchy.org" target="_blank" rel="noopener">catholic-hierarchy.org ↗</a></div>
+        <div class="src-card"><b>Annuario Pontificio &amp; Annus Statisticus Ecclesiae</b>
+          <p>Annuaire officiel du Saint-Siège et recueil statistique annuel (Librairie Éditrice Vaticane).</p></div>
+        <div class="src-card"><b>OpenStreetMap &amp; Leaflet</b>
+          <p>Fond de carte libre © contributeurs OpenStreetMap (ODbL) · moteur de carte open-source Leaflet.</p>
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">openstreetmap.org/copyright ↗</a> &nbsp;
+          <a href="https://leafletjs.com" target="_blank" rel="noopener">leafletjs.com ↗</a></div>
+      </div>
+
+      <div class="info-tab" id="info-conf" style="display:none">
+        <ul>
+          <li><b>Aucun cookie</b>, aucun traceur, aucun compte utilisateur.</li>
+          <li><b>Aucune donnée personnelle</b> n'est collectée, stockée ou revendue — rien n'est enregistré sur votre appareil.</li>
+          <li>La <b>recherche</b> s'effectue localement, dans votre navigateur.</li>
+          <li>Le clic sur une fiche interroge l'API (carta-pastorale.onrender.com) : comme pour toute visite web, ce serveur peut journaliser une adresse IP technique, sans profilage.</li>
+          <li>Votre <b>position géographique n'est jamais demandée</b>.</li>
+          <li>Le <b>code source est lisible</b> : clic droit → « Afficher le code source de la page ».</li>
+        </ul>
+      </div>
+
+      <div class="info-tab" id="info-projets" style="display:none">
+        <div class="verse">« L'amour et la vérité se rencontrent, la justice et la paix s'embrassent. »
+          <span>— Psaume 85, 11 · le fil qui relie ces quatre projets</span></div>
+        <div class="proj-grid">
+          <div class="proj-card"><b>🧭 Le Bon Alignement</b>
+            <span class="vtag">« Amour et vérité se rencontrent »</span>
+            <p>Outil gratuit et 100 % confidentiel de discernement éthique : nommer ce qui est en jeu dans vos choix.</p>
+            <a href="https://lebon-juste-alignement.netlify.app/" target="_blank" rel="noopener">Visiter ↗</a></div>
+          <div class="proj-card"><b>🏠 Au Foyer de l'Amour</b>
+            <span class="vtag">« Justice et paix s'embrassent »</span>
+            <p>Discernement spirituel et « petite lumière » : textes à méditer, prières, exercices ignatiens, écoute.</p>
+            <a href="https://amour-et-verite-app.netlify.app/" target="_blank" rel="noopener">Visiter ↗</a></div>
+          <div class="proj-card"><b>⚖️ Justice AI</b>
+            <p>Assistance juridique avec IA, anonyme et gratuite : comprendre vos droits, à titre éducatif.</p>
+            <a href="https://justice-ai-anonyme-2.onrender.com/" target="_blank" rel="noopener">Visiter ↗</a></div>
+          <div class="proj-card"><b>🌉 ONBRIDGE AI</b>
+            <p>Un pont entre vos projets et l'intelligence artificielle.</p>
+            <a href="https://bridge-your-project.lovable.app/" target="_blank" rel="noopener">Visiter ↗</a></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="data.js"></script>
+<script>
+/* ============ Carta Pastorale — carte v6 bilingue FR/EN connectée à l'API ============ */
+/* ================= BILINGUE FR/EN ================= */
+let LANG = localStorage.getItem('cp_lang') || (((navigator.language||'fr').toLowerCase().startsWith('en')) ? 'en' : 'fr');
+let lastDetail = null;
+
+const I18N = {
+  fr: {
+    title:'Carta Pastorale — Carte mondiale des diocèses',
+    subtitle:"Carte mondiale des diocèses — rapports pastoraux en direct de l'API",
+    searchPh:'Rechercher votre diocèse… (ex : Lyon, Kinshasa, Boston)',
+    infoTitle:'À propos, sources, confidentialité', closeTitle:'Fermer',
+    tabs:{apropos:'À propos',sources:'Sources',conf:'Confidentialité',projets:'Autres projets'},
+    conts:{Tous:'Tous',Afrique:'Afrique','Amérique du Nord':'Amérique du Nord','Amérique latine':'Amérique latine',Asie:'Asie',Europe:'Europe','Océanie':'Océanie',Autre:'Autre'},
+    legend:[['#dc2626','Archidiocèse métropolitain',0],['#f59e0b','Archidiocèse',0],['#2563eb','Diocèse',0],['#0d9488','Autre juridiction',0],['#2563eb','Position approximative',1]],
+    stats:(s,e,t)=>`${s.toLocaleString('fr-FR')} diocèses affichés · ${e.toLocaleString('fr-FR')} positions exactes / ${t.toLocaleString('fr-FR')}`,
+    approx:'position approximative', noPos:'sans position',
+    noPosToast:n=>`« ${n} » : position non disponible — rapport affiché`,
+    loading:'Chargement du rapport pastoral…',
+    wake:'(le serveur peut mettre ~1 min à se réveiller — ',
+    errApi:"⚠️ Impossible de joindre l'API pour le moment.", retry:'Réessayer',
+    offlineData:'Données hors ligne', refreshed:"Données actualisées depuis l'API",
+    offlineMap:'Fond de carte hors ligne activé',
+    secKeys:'Chiffres clés', secTrend:'Évolution (indice base 100)', secInd:'Indicateurs pastoraux',
+    secCtx:'Contexte du pays', secPistes:'Pistes pastorales', secQuest:'Questions de discernement',
+    L:{cath:'Catholiques',pcath:'% catholiques',pop:'Population',sup:'Superficie',pretres:'Prêtres',
+       paroisses:'Paroisses',pdio:'Prêtres diocésains',prel:'Prêtres religieux',religieuses:'Religieuses',
+       diacres:'Diacres perm.',categorie:'Catégorie',
+       idh:'Indice de développement humain',pib:'PIB par habitant',urb:"Taux d'urbanisation",
+       lib:'Liberté religieuse',pers:'Score de persécution'},
+    refMonde:'réf. monde', dataYear:y=>`données ${y}`,
+    src:'Source', maj:'mise à jour', gcath:'Voir la fiche sur GCatholic ↗',
+    served:'Rapport servi en direct par l\'API Carta Pastorale v2.3.0',
+    trend:{catholiques:'Catholiques',pretres:'Prêtres',seminaristes:'Séminaristes'}
+  },
+  en: {
+    title:'Carta Pastorale — World map of Catholic dioceses',
+    subtitle:'World map of Catholic dioceses — pastoral reports live from the API',
+    searchPh:'Find your diocese… (e.g. Lyon, Kinshasa, Boston)',
+    infoTitle:'About, sources, privacy', closeTitle:'Close',
+    tabs:{apropos:'About',sources:'Sources',conf:'Privacy',projets:'Other projects'},
+    conts:{Tous:'All',Afrique:'Africa','Amérique du Nord':'North America','Amérique latine':'Latin America',Asie:'Asia',Europe:'Europe','Océanie':'Oceania',Autre:'Other'},
+    legend:[['#dc2626','Metropolitan archdiocese',0],['#f59e0b','Archdiocese',0],['#2563eb','Diocese',0],['#0d9488','Other jurisdiction',0],['#2563eb','Approximate position',1]],
+    stats:(s,e,t)=>`${s.toLocaleString('en-US')} dioceses shown · ${e.toLocaleString('en-US')} exact positions / ${t.toLocaleString('en-US')}`,
+    approx:'approximate position', noPos:'no position',
+    noPosToast:n=>`"${n}": position not available — showing report`,
+    loading:'Loading pastoral report…',
+    wake:'(the server may take ~1 min to wake up — ',
+    errApi:'⚠️ Unable to reach the API right now.', retry:'Retry',
+    offlineData:'Offline data', refreshed:'Data refreshed from the API',
+    offlineMap:'Offline basemap enabled',
+    secKeys:'Key figures', secTrend:'Trend (index, base 100)', secInd:'Pastoral indicators',
+    secCtx:'Country context', secPistes:'Pastoral pathways', secQuest:'Discernment questions',
+    L:{cath:'Catholics',pcath:'% Catholic',pop:'Population',sup:'Area',pretres:'Priests',
+       paroisses:'Parishes',pdio:'Diocesan priests',prel:'Religious priests',religieuses:'Religious sisters',
+       diacres:'Perm. deacons',categorie:'Category',
+       idh:'Human Development Index',pib:'GDP per capita',urb:'Urbanization rate',
+       lib:'Religious freedom',pers:'Persecution score'},
+    refMonde:'world reference', dataYear:y=>`${y} data`,
+    src:'Source', maj:'updated', gcath:'View record on GCatholic ↗',
+    served:'Report served live by the Carta Pastorale API v2.3.0',
+    trend:{catholiques:'Catholics',pretres:'Priests',seminaristes:'Seminarians'}
+  }
+};
+const T = () => I18N[LANG];
+const LOC = () => LANG==='en' ? 'en-US' : 'fr-FR';
+
+/* --- traduction des textes générés par l'API --- */
+const TR_CAT = {'archidiocèse métropolitain':'Metropolitan archdiocese','archidiocèse':'Archdiocese',
+  'diocèse':'Diocese','administration apostolique':'Apostolic administration','autre':'Other jurisdiction','inconnu':'Unknown'};
+const TR_CONT = {'Afrique':'Africa','Amérique du Nord':'North America','Amérique latine':'Latin America',
+  'Asie':'Asia','Europe':'Europe','Océanie':'Oceania','Autre':'Other','Inconnu':'Unknown','Amerique':'Latin America','Amérique':'Latin America','Amérique du Sud':'Latin America','Oceanie':'Oceania'};
+const TR_IND = {'Catholiques par prêtre':'Catholics per priest','Catholiques par paroisse':'Catholics per parish',
+  'Pourcentage de catholiques':'Percentage of Catholics','Taux de vocations':'Vocations rate'};
+const TR_UNITE = {'cath./prêtre':'cath./priest','cath./paroisse':'cath./parish'};
+const TR_INTERP_EXACT = {
+  'Catholicisme majoritaire. Enjeu : évangélisation des marginaux et nouvelles formes de sécularisation.':'Majority Catholic context. Challenge: evangelizing the margins and facing new forms of secularization.',
+  'Catholicisme minoritaire. Enjeu : nouvelle évangélisation et témoignage crédible.':'Minority Catholic context. Challenge: new evangelization and credible witness.',
+  'Charge pastorale moyenne.':'Average pastoral load.',
+  'Dynamique vocationnelle saine.':'Healthy vocational momentum.',
+  'Dynamique vocationnelle à renforcer.':'Vocational momentum to be strengthened.',
+  'Paroisses surchargées. Réflexion sur de nouvelles unités pastorales.':'Parishes are overstretched. Consider creating new pastoral units.',
+  'Territoire étendu. Enjeu : moyens de transport et prêtres itinérants.':'Vast territory. Challenge: means of transport and itinerant priests.'
+};
+const TR_PISTE = {
+  '**Catholicisme majoritaire** : Comment éviter la routine et raviver la foi des baptisés ? Comment évangéliser les marginaux et les sans-religion ?':'**Majority Catholic context**: How to avoid routine and rekindle the faith of the baptized? How to evangelize the marginalized and the non-religious?',
+  "**Créer de nouvelles unités pastorales** : Les paroisses sont surchargées. Réfléchir à la création de communautés ecclésiales de base animées par des laïcs formés.":'**Create new pastoral units**: Parishes are overstretched. Consider basic ecclesial communities led by trained lay people.',
+  '**Données pastorales** : Les rapports détaillés avec pistes missionnaires nécessitent une analyse approfondie des données locales.':'**Pastoral data**: Detailed reports with missionary pathways require in-depth analysis of local data.',
+  '**Nouvelle évangélisation** : Dans un contexte de catholicisme minoritaire, comment témoigner de la foi de manière crédible et respectueuse ?':'**New evangelization**: In a minority Catholic context, how can we bear credible and respectful witness to the faith?',
+  '**Renforcer la présence des laïcs** : Avec un ratio élevé de catholiques par prêtre, la structuration des communautés ecclésiales de base et la formation des catéchistes deviennent prioritaires.':'**Strengthen lay presence**: With a high Catholics-per-priest ratio, structuring basic ecclesial communities and training catechists becomes a priority.'
+};
+const TR_QUESTION = {
+  "Comment les paroisses peuvent-elles devenir des 'maisons d'accueil' pour les personnes en quête de sens ?":"How can parishes become 'houses of welcome' for people searching for meaning?",
+  "Comment structurer des 'mini-paroisses' animées par des laïcs formés dans les zones où un prêtre ne peut passer qu'une fois par mois ?":"How can we structure 'mini-parishes' led by trained lay people in areas a priest can only visit once a month?",
+  'Comment témoigner de la foi dans un contexte où les catholiques sont une petite minorité ?':'How can we witness to the faith in a context where Catholics are a small minority?',
+  'Quelles sont les priorités pastorales pour ce diocèse dans les 5 prochaines années ?':"What are this diocese's pastoral priorities for the next 5 years?"
+};
+const TR_DEFI = {
+  'Abandon de la pratique religieuse':'Decline in religious practice','Arrestations de chrétiens':'Arrests of Christians',
+  'Athéisme majoritaire':'Majority atheism','Attaques contre les chrétiens':'Attacks on Christians',
+  'Attentats contre les églises':'Attacks on churches','Baisse des vocations sacerdotales':'Decline in priestly vocations',
+  'Catholicisme marginal':'Marginal Catholicism','Catholicisme minoritaire':'Minority Catholicism',
+  'Catholicisme quasi invisible':'Almost invisible Catholicism','Concurrence des églises protestantes':'Competition from Protestant churches',
+  'Conflit armé':'Armed conflict','Conflit dans le sud (Mindanao)':'Conflict in the south (Mindanao)',
+  'Conflits armés et insécurité':'Armed conflicts and insecurity','Contexte socio-économique à analyser':'Socio-economic context to be analyzed',
+  'Corruption':'Corruption','Criminalité':'Crime','Crise anglophone':'Anglophone crisis',
+  'Crise humanitaire et exode':'Humanitarian crisis and exodus','Crise politique':'Political crisis',
+  'Crise économique et pauvreté':'Economic crisis and poverty','Croissance des églises évangéliques':'Growth of evangelical churches',
+  'Croissance démographique':'Population growth','Culte clandestin':'Clandestine worship',
+  'Destruction des églises':'Destruction of churches','Diminution des pratiquants':'Decline in churchgoers',
+  'Discrimination légale':'Legal discrimination','Discrimination systémique':'Systemic discrimination',
+  'Divisions ethniques':'Ethnic divisions','Données locales à compléter':'Local data to be completed',
+  'Déclin des pratiquants':'Decline in churchgoers','Déclin des vocations':'Decline in vocations',
+  'Déclin du catholicisme':'Decline of Catholicism','Déclin du catholicisme québécois':'Decline of Quebec Catholicism',
+  'Déplacements massifs de population':'Mass population displacement','Déplacés et réfugiés':'Displaced people and refugees',
+  'Déplacés internes':'Internally displaced people','Développement des infrastructures':'Infrastructure development',
+  'Développement économique':'Economic development','Exode des chrétiens':'Exodus of Christians',
+  'Gestion du patrimoine religieux':'Religious heritage management','Guerre civile':'Civil war',
+  'Immigration catholique latino-américaine':'Latin American Catholic immigration','Immigration et diversité':'Immigration and diversity',
+  'Immigration haïtienne':'Haitian immigration','Instabilité politique':'Political instability',
+  'Interdiction de conversion':'Ban on conversion',"Interdiction de l'évangélisation":'Ban on evangelization',
+  "Interdiction totale de l'évangélisation":'Total ban on evangelization','Inégalités':'Inequalities',
+  'Inégalités sociales massives':'Massive social inequalities','Islam radical dans certaines zones':'Radical Islam in some areas',
+  'Kidnappings de prêtres et religieux':'Kidnappings of priests and religious','Lois anti-conversion':'Anti-conversion laws',
+  "Maintien de l'identité catholique":'Preserving Catholic identity','Maintien du lien avec les jeunes générations':'Keeping the bond with younger generations',
+  'Nationalisme':'Nationalism','Nationalisme hindou et persécution':'Hindu nationalism and persecution',
+  'Nouvelle évangélisation':'New evangelization','Nouvelle évangélisation des jeunes':'New evangelization of young people',
+  'Pauvreté et sous-développement':'Poverty and underdevelopment','Pauvreté extrême':'Extreme poverty',
+  'Pauvreté rurale':'Rural poverty','Persécution politique':'Political persecution',
+  'Persécution systémique':'Systemic persecution','Persécution violente dans le nord':'Violent persecution in the north',
+  'Perte massive de fidèles vers les évangéliques':'Massive loss of faithful to evangelical churches','Pluralisme religieux':'Religious pluralism',
+  'Polarisation politique et religieuse':'Political and religious polarization','Pressions politiques':'Political pressure',
+  'Pénurie de ressources':'Resource shortage','Pénuries de prêtres en zone rurale':'Priest shortages in rural areas',
+  "Restrictions de construction d'églises":'Restrictions on church construction',"Restrictions sur l'usage du mot 'Allah'":"Restrictions on the use of the word 'Allah'",
+  'Restrictions sur la société civile':'Restrictions on civil society','Risque de mort pour conversion':'Death penalty risk for conversion',
+  "Rôle de l'Église dans la société":"Role of the Church in society",'Scandales et confiance':'Scandals and trust',
+  'Surveillance numérique':'Digital surveillance','Sécularisation':'Secularization',
+  'Sécularisation avancée':'Advanced secularization','Sécularisation croissante':'Growing secularization',
+  'Sécularisation des jeunes':'Secularization of young people','Sécularisation généralisée':'Widespread secularization',
+  'Sécularisation massive':'Massive secularization','Sécularisation progressive':'Gradual secularization',
+  'Sécularisation urbaine':'Urban secularization','Tensions dans les communautés indigènes':'Tensions in indigenous communities',
+  'Vieillissement de la population':'Aging population','Vieillissement des prêtres':'Aging clergy',
+  'Vieillissement rapide':'Rapid aging','Violence dans les zones rurales':'Violence in rural areas',
+  'Violence liée au narcotrafic':'Drug-trafficking violence','Violences tribales':'Tribal violence',
+  'Église patriotique vs souterraine':'Patriotic church vs underground church','Évangéliques en croissance':'Growing evangelical movements',
+  'Évangélisation des jeunes':'Evangelization of young people',
+  'Accès aux Lieux saints':'Access to the Holy Places','Attentats de 2019':'The 2019 attacks',
+  'Autoritarisme':'Authoritarianism','Autoritarisme de Bukele':'Bukele\'s authoritarianism',
+  'Autoritarisme politique':'Political authoritarianism','Catholicisme d\'expatriés':'Expatriate Catholicism',
+  'Catholicisme très minoritaire':'Very small Catholic minority','Changements climatiques':'Climate change',
+  'Conflit avec l\'Arménie':'Conflict with Armenia','Conflit avec l\'Azerbaïdjan':'Conflict with Azerbaijan',
+  'Conflit israélo-palestinien':'Israeli-Palestinian conflict','Conflits ethniques':'Ethnic conflicts',
+  'Contrôle communiste':'Communist control','Contrôle étatique':'State control',
+  'Contrôle étatique sur l\'Église':'State control over the Church','Conversion de Sainte-Sophie':'Conversion of Hagia Sophia',
+  'Coup d\'État militaire':'Military coup','Crise économique':'Economic crisis',
+  'Croissance des églises pentecôtistes':'Growth of Pentecostal churches','Croissance des évangéliques':'Growth of Evangelicals',
+  'Cyclones et catastrophes naturelles':'Cyclones and natural disasters','Dette et crise économique':'Debt and economic crisis',
+  'Dialogue interreligieux':'Interreligious dialogue','Dictature et persécution':'Dictatorship and persecution',
+  'Déclin des deux grandes Églises':'Decline of the two major Churches','Déclin démographique':'Demographic decline',
+  'Déforestation et écologie':'Deforestation and ecology','Déliquescence de l\'État':'State decay',
+  'Dépendance agricole':'Agricultural dependence','Dépendance pétrolière':'Oil dependence',
+  'Déplacés massifs':'Mass displacement','Développement des institutions':'Institution building',
+  'Développement durable':'Sustainable development','Développement inégal':'Uneven development',
+  'Développement économique inégal':'Uneven economic development','Effondrement de l\'État':'State collapse',
+  'Effondrement de la confiance':'Collapse of trust','Effondrement économique':'Economic collapse',
+  'Exil de prêtres et évêques':'Exile of priests and bishops','Exode des chrétiens de Bethléem':'Exodus of Bethlehem\'s Christians',
+  'Exode des jeunes':'Youth exodus','Exode massif':'Mass exodus',
+  'Exode massif des chrétiens':'Mass exodus of Christians','Famine':'Famine',
+  'Famine et déplacements':'Famine and displacement','Famine et insécurité alimentaire':'Famine and food insecurity',
+  'Fermeture d\'ONG catholiques':'Closure of Catholic NGOs','Fermetures d\'églises':'Church closures',
+  'Gangs et insécurité':'Gangs and insecurity','Guerre d\'invasion russe':'Russia\'s war of invasion',
+  'Guerre en Ukraine':'War in Ukraine','Immigration et dialogue interreligieux':'Immigration and interreligious dialogue',
+  'Insurrection islamiste dans le nord':'Islamist insurgency in the north','Interdiction de l\'évangélisation':'Ban on evangelization',
+  'Interdiction de la conversion':'Ban on conversion','Inégalités sociales':'Social inequality',
+  'Loi anti-missionnaire':'Anti-missionary law','Lois sur le blasphème':'Blasphemy laws',
+  'Maintien d\'une présence chrétienne':'Maintaining a Christian presence','Maintien de l\'identité catholique':'Preserving Catholic identity',
+  'Migration':'Migration','Nationalisme et persécution':'Nationalism and persecution',
+  'Occupation et restrictions':'Occupation and restrictions','Ouragans et catastrophes':'Hurricanes and disasters',
+  'Pauvreté':'Poverty','Pauvreté et inégalités':'Poverty and inequality',
+  'Pauvreté et surpopulation':'Poverty and overpopulation','Pauvreté malgré les ressources':'Poverty despite natural resources',
+  'Pauvreté massive':'Mass poverty','Persécution dans certaines régions':'Persecution in some regions',
+  'Persécution dans les régimes autoritaires':'Persecution under authoritarian regimes','Persécution des catholiques':'Persecution of Catholics',
+  'Persécution des chrétiens':'Persecution of Christians','Persécution des leaders':'Persecution of leaders',
+  'Persécution des minorités':'Persecution of minorities','Persécution du régime Ortega':'Persecution by the Ortega regime',
+  'Persécution extrême':'Extreme persecution','Polarisation politique':'Political polarization',
+  'Pressions islamistes':'Islamist pressure','Pressions économiques':'Economic pressure',
+  'Pénuries économiques':'Economic shortages','Questions environnementales':'Environmental issues',
+  'Radicalisme islamique':'Islamic radicalism','Reconstruction de l\'Église':'Rebuilding the Church',
+  'Reconstruction post-conflit':'Post-conflict reconstruction','Refugiés syriens et irakiens':'Syrian and Iraqi refugees',
+  'Renouveau spirituel':'Spiritual renewal','Restrictions de construction d\'églises':'Church-building restrictions',
+  'Restrictions législatives':'Legislative restrictions','Restrictions religieuses':'Religious restrictions',
+  'Restrictions sur l\'usage du mot \'Allah\'':'Restrictions on the use of the word \'Allah\'','Restrictions sur les minorités':'Restrictions on minorities',
+  'Russophonie':'Russophone identity','Réconciliation post-génocide':'Post-genocide reconciliation',
+  'Répression des manifestations':'Crackdown on protests','Rôle de l\'Église dans la société':'The Church\'s role in society',
+  'Sida et santé publique':'AIDS and public health','Sorties massives de l\'Église':'Mass exodus from the Church',
+  'Syncrétisme religieux':'Religious syncretism','Sécularisation brutale':'Harsh secularization',
+  'Sécularisation de la société':'Secularization of society','Sécularisation très avancée':'Very advanced secularization',
+  'Séismes et catastrophes':'Earthquakes and disasters','Séquelles du génocide de Daech':'Aftermath of the ISIS genocide',
+  'Tensions avec la Russie':'Tensions with Russia','Tensions ethniques':'Ethnic tensions',
+  'Tensions interreligieuses':'Interreligious tensions','Tensions politiques':'Political tensions',
+  'Violence':'Violence','Violence des gangs':'Gang violence',
+  'Violences communautaires':'Communal violence','Église souterraine':'Underground Church',
+  'Émigration des jeunes':'Youth emigration','Émigration massive':'Mass emigration',
+};
+
+function trInterp(s){
+  if(LANG!=='en' || !s) return s;
+  if(TR_INTERP_EXACT[s]) return TR_INTERP_EXACT[s];
+  let m = s.match(/^Un prêtre pour ([\d\s.,]+) catholiques\. Ratio favorable, richesse pastorale à partager\./);
+  if(m) return `One priest for ${m[1]} Catholics. Favourable ratio — pastoral wealth to share.`;
+  m = s.match(/^Un prêtre pour ([\d\s.,]+) catholiques\. Ratio élevé, renforcer les laïcs\./);
+  if(m) return `One priest for ${m[1]} Catholics. High ratio — strengthen lay ministry.`;
+  return s;
+}
+const trD = (dict, s) => (LANG==='en' && dict[s]) ? dict[s] : s;
+const trCat = s => trD(TR_CAT, s);
+const trCont = s => trD(TR_CONT, s);
+const trInd = s => trD(TR_IND, s);
+const trUnite = s => trD(TR_UNITE, s);
+const trPiste = s => trD(TR_PISTE, s);
+const trQuest = s => trD(TR_QUESTION, s);
+const trDefi = s => trD(TR_DEFI, s);
+
+/* contexte_liberte : FR -> EN (259 chaînes de l'API, y compris les contextes corrigés) */
+const CTX_EN = {
+"Données détaillées non disponibles pour . Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for . Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour Western Sahara. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for Western Sahara. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour af. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for af. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour an. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for an. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour bf. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for bf. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour bj. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for bj. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour bz. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for bz. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour ce. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for ce. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour dj. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for dj. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour en. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for en. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour eq. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for eq. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour er. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for er. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour fa. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for fa. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour fj. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for fj. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour ga. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for ga. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour gu. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for gu. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour gy. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for gy. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour ho. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for ho. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour ic. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for ic. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour ka. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for ka. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour ki. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for ki. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour ko. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for ko. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour ku. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for ku. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour ky. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for ky. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour le. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for le. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour ma. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for ma. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour ml. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for ml. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour mo. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for mo. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour na. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for na. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour ne. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for ne. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour no. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for no. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour sc. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for sc. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour sn. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for sn. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour so. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for so. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour sr. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for sr. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour su. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for su. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour sw. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for sw. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour ta. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for ta. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour tg. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for tg. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour ti. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for ti. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour to. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for to. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour tu. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for tu. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour u.. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for u.. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour uz. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for uz. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour va. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for va. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour vi. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for vi. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour wa. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for wa. Religious freedom and socio-economic context should be verified locally.",
+"Données détaillées non disponibles pour we. Liberté religieuse et contexte socio-économique à vérifier localement.":"Detailed data not available for we. Religious freedom and socio-economic context should be verified locally.",
+"Données spécifiques non disponibles pour Afghanistan. Liberté religieuse très variable. Catholicisme minoritaire et souvent persécuté dans les pays musulmans et communistes. Très dynamique en Asie du Sud-Est.":"Specific data not available for Afghanistan. Religious freedom varies widely. A minority Catholicism, often persecuted in Muslim and communist countries. Very dynamic in Southeast Asia.",
+"Données spécifiques non disponibles pour Algeria. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Algeria. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour American Samoa. Liberté religieuse totale. Catholicisme minoritaire mais actif. Pays très développés avec multiculturalisme affirmé.":"Specific data not available for American Samoa. Full religious freedom. A minority but active Catholicism. Highly developed countries with assertive multiculturalism.",
+"Données spécifiques non disponibles pour Antigua and Barbuda. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for Antigua and Barbuda. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour Bahamas. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for Bahamas. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour Barbados. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for Barbados. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour Belize. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for Belize. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour Benin. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Benin. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Bermuda. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for Bermuda. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour Bosnia and Herzegovina. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for Bosnia and Herzegovina. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour Botswana. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Botswana. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Brunei. Liberté religieuse très variable. Catholicisme minoritaire et souvent persécuté dans les pays musulmans et communistes. Très dynamique en Asie du Sud-Est.":"Specific data not available for Brunei. Religious freedom varies widely. A minority Catholicism, often persecuted in Muslim and communist countries. Very dynamic in Southeast Asia.",
+"Données spécifiques non disponibles pour Burkina Faso. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Burkina Faso. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Cabo Verde. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Cabo Verde. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Chad. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Chad. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Comoros. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Comoros. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Congo-Brazzaville. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Congo-Brazzaville. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Cook Islands. Liberté religieuse totale. Catholicisme minoritaire mais actif. Pays très développés avec multiculturalisme affirmé.":"Specific data not available for Cook Islands. Full religious freedom. A minority but active Catholicism. Highly developed countries with assertive multiculturalism.",
+"Données spécifiques non disponibles pour Curaçao. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for Curaçao. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour Democratic Republic of the Congo. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Democratic Republic of the Congo. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Denmark. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for Denmark. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour Djibouti. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Djibouti. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Equatorial Guinea. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Equatorial Guinea. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Eritrea. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Eritrea. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Eswatini. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Eswatini. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Falkland Islands. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for Falkland Islands. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour Fiji. Liberté religieuse totale. Catholicisme minoritaire mais actif. Pays très développés avec multiculturalisme affirmé.":"Specific data not available for Fiji. Full religious freedom. A minority but active Catholicism. Highly developed countries with assertive multiculturalism.",
+"Données spécifiques non disponibles pour Finland. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for Finland. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour French Guiana. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for French Guiana. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour French Polynesia. Liberté religieuse totale. Catholicisme minoritaire mais actif. Pays très développés avec multiculturalisme affirmé.":"Specific data not available for French Polynesia. Full religious freedom. A minority but active Catholicism. Highly developed countries with assertive multiculturalism.",
+"Données spécifiques non disponibles pour Gabon. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Gabon. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Gambia. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Gambia. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Gibraltar. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for Gibraltar. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour Greece. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for Greece. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour Grenada. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for Grenada. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour Guadeloupe. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for Guadeloupe. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour Guam. Liberté religieuse totale. Catholicisme minoritaire mais actif. Pays très développés avec multiculturalisme affirmé.":"Specific data not available for Guam. Full religious freedom. A minority but active Catholicism. Highly developed countries with assertive multiculturalism.",
+"Données spécifiques non disponibles pour Guinea-Bissau. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Guinea-Bissau. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Guinea. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Guinea. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Guyana. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for Guyana. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour Hong Kong. Liberté religieuse très variable. Catholicisme minoritaire et souvent persécuté dans les pays musulmans et communistes. Très dynamique en Asie du Sud-Est.":"Specific data not available for Hong Kong. Religious freedom varies widely. A minority Catholicism, often persecuted in Muslim and communist countries. Very dynamic in Southeast Asia.",
+"Données spécifiques non disponibles pour Iceland. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for Iceland. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour Kazakhstan. Liberté religieuse très variable. Catholicisme minoritaire et souvent persécuté dans les pays musulmans et communistes. Très dynamique en Asie du Sud-Est.":"Specific data not available for Kazakhstan. Religious freedom varies widely. A minority Catholicism, often persecuted in Muslim and communist countries. Very dynamic in Southeast Asia.",
+"Données spécifiques non disponibles pour Kiribati. Liberté religieuse totale. Catholicisme minoritaire mais actif. Pays très développés avec multiculturalisme affirmé.":"Specific data not available for Kiribati. Full religious freedom. A minority but active Catholicism. Highly developed countries with assertive multiculturalism.",
+"Données spécifiques non disponibles pour Kosovo. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for Kosovo. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour Kyrgyzstan. Liberté religieuse très variable. Catholicisme minoritaire et souvent persécuté dans les pays musulmans et communistes. Très dynamique en Asie du Sud-Est.":"Specific data not available for Kyrgyzstan. Religious freedom varies widely. A minority Catholicism, often persecuted in Muslim and communist countries. Very dynamic in Southeast Asia.",
+"Données spécifiques non disponibles pour Lesotho. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Lesotho. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Liberia. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Liberia. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Libya. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Libya. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Liechtenstein. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for Liechtenstein. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour Luxembourg. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for Luxembourg. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour Macau. Liberté religieuse très variable. Catholicisme minoritaire et souvent persécuté dans les pays musulmans et communistes. Très dynamique en Asie du Sud-Est.":"Specific data not available for Macau. Religious freedom varies widely. A minority Catholicism, often persecuted in Muslim and communist countries. Very dynamic in Southeast Asia.",
+"Données spécifiques non disponibles pour Mali. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Mali. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Malta. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for Malta. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour Marshall Islands. Liberté religieuse totale. Catholicisme minoritaire mais actif. Pays très développés avec multiculturalisme affirmé.":"Specific data not available for Marshall Islands. Full religious freedom. A minority but active Catholicism. Highly developed countries with assertive multiculturalism.",
+"Données spécifiques non disponibles pour Martinique. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for Martinique. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour Mauritania. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Mauritania. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Mauritius. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Mauritius. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Monaco. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for Monaco. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour Mongolia. Liberté religieuse très variable. Catholicisme minoritaire et souvent persécuté dans les pays musulmans et communistes. Très dynamique en Asie du Sud-Est.":"Specific data not available for Mongolia. Religious freedom varies widely. A minority Catholicism, often persecuted in Muslim and communist countries. Very dynamic in Southeast Asia.",
+"Données spécifiques non disponibles pour Montenegro. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for Montenegro. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour Morocco. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Morocco. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Namibia. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Namibia. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour New Caledonia. Liberté religieuse totale. Catholicisme minoritaire mais actif. Pays très développés avec multiculturalisme affirmé.":"Specific data not available for New Caledonia. Full religious freedom. A minority but active Catholicism. Highly developed countries with assertive multiculturalism.",
+"Données spécifiques non disponibles pour Niger. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Niger. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour North Korea. Liberté religieuse très variable. Catholicisme minoritaire et souvent persécuté dans les pays musulmans et communistes. Très dynamique en Asie du Sud-Est.":"Specific data not available for North Korea. Religious freedom varies widely. A minority Catholicism, often persecuted in Muslim and communist countries. Very dynamic in Southeast Asia.",
+"Données spécifiques non disponibles pour North Macedonia. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for North Macedonia. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour Northern Mariana Islands. Liberté religieuse totale. Catholicisme minoritaire mais actif. Pays très développés avec multiculturalisme affirmé.":"Specific data not available for Northern Mariana Islands. Full religious freedom. A minority but active Catholicism. Highly developed countries with assertive multiculturalism.",
+"Données spécifiques non disponibles pour Norway. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for Norway. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour Present Prelates. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for Present Prelates. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour Saint Helena, Ascension and Tristan da Cunha. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Saint Helena, Ascension and Tristan da Cunha. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Saint Lucia. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for Saint Lucia. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour Samoa. Liberté religieuse totale. Catholicisme minoritaire mais actif. Pays très développés avec multiculturalisme affirmé.":"Specific data not available for Samoa. Full religious freedom. A minority but active Catholicism. Highly developed countries with assertive multiculturalism.",
+"Données spécifiques non disponibles pour Senegal. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Senegal. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Seychelles. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Seychelles. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Sierra Leone. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Sierra Leone. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Singapore. Liberté religieuse très variable. Catholicisme minoritaire et souvent persécuté dans les pays musulmans et communistes. Très dynamique en Asie du Sud-Est.":"Specific data not available for Singapore. Religious freedom varies widely. A minority Catholicism, often persecuted in Muslim and communist countries. Very dynamic in Southeast Asia.",
+"Données spécifiques non disponibles pour Slovenia. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for Slovenia. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour Solomon Islands. Liberté religieuse totale. Catholicisme minoritaire mais actif. Pays très développés avec multiculturalisme affirmé.":"Specific data not available for Solomon Islands. Full religious freedom. A minority but active Catholicism. Highly developed countries with assertive multiculturalism.",
+"Données spécifiques non disponibles pour Somalia. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Somalia. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Suriname. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for Suriname. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour Sweden. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for Sweden. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour Taiwan. Liberté religieuse très variable. Catholicisme minoritaire et souvent persécuté dans les pays musulmans et communistes. Très dynamique en Asie du Sud-Est.":"Specific data not available for Taiwan. Religious freedom varies widely. A minority Catholicism, often persecuted in Muslim and communist countries. Very dynamic in Southeast Asia.",
+"Données spécifiques non disponibles pour Tajikistan. Liberté religieuse très variable. Catholicisme minoritaire et souvent persécuté dans les pays musulmans et communistes. Très dynamique en Asie du Sud-Est.":"Specific data not available for Tajikistan. Religious freedom varies widely. A minority Catholicism, often persecuted in Muslim and communist countries. Very dynamic in Southeast Asia.",
+"Données spécifiques non disponibles pour Togo. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Togo. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Tokelau. Liberté religieuse totale. Catholicisme minoritaire mais actif. Pays très développés avec multiculturalisme affirmé.":"Specific data not available for Tokelau. Full religious freedom. A minority but active Catholicism. Highly developed countries with assertive multiculturalism.",
+"Données spécifiques non disponibles pour Tonga. Liberté religieuse totale. Catholicisme minoritaire mais actif. Pays très développés avec multiculturalisme affirmé.":"Specific data not available for Tonga. Full religious freedom. A minority but active Catholicism. Highly developed countries with assertive multiculturalism.",
+"Données spécifiques non disponibles pour Trinidad and Tobago. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for Trinidad and Tobago. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour Tunisia. Liberté religieuse très variable selon les régions. Catholicisme très dynamique dans de nombreux pays. Pauvreté, conflits et persécution dans certaines zones.":"Specific data not available for Tunisia. Religious freedom varies widely by region. A very dynamic Catholicism in many countries. Poverty, conflict and persecution in some areas.",
+"Données spécifiques non disponibles pour Turkmenistan. Liberté religieuse très variable. Catholicisme minoritaire et souvent persécuté dans les pays musulmans et communistes. Très dynamique en Asie du Sud-Est.":"Specific data not available for Turkmenistan. Religious freedom varies widely. A minority Catholicism, often persecuted in Muslim and communist countries. Very dynamic in Southeast Asia.",
+"Données spécifiques non disponibles pour U.S. Virgin Islands. Liberté religieuse constitutionnelle. Catholicisme minoritaire mais diversifié. Sociétés très développées.":"Specific data not available for U.S. Virgin Islands. Constitutional religious freedom. A minority but diverse Catholicism. Highly developed societies.",
+"Données spécifiques non disponibles pour Uzbekistan. Liberté religieuse très variable. Catholicisme minoritaire et souvent persécuté dans les pays musulmans et communistes. Très dynamique en Asie du Sud-Est.":"Specific data not available for Uzbekistan. Religious freedom varies widely. A minority Catholicism, often persecuted in Muslim and communist countries. Very dynamic in Southeast Asia.",
+"Données spécifiques non disponibles pour Vanuatu. Liberté religieuse totale. Catholicisme minoritaire mais actif. Pays très développés avec multiculturalisme affirmé.":"Specific data not available for Vanuatu. Full religious freedom. A minority but active Catholicism. Highly developed countries with assertive multiculturalism.",
+"Données spécifiques non disponibles pour Wallis and Futuna. Liberté religieuse totale. Catholicisme minoritaire mais actif. Pays très développés avec multiculturalisme affirmé.":"Specific data not available for Wallis and Futuna. Full religious freedom. A minority but active Catholicism. Highly developed countries with assertive multiculturalism.",
+"Données spécifiques non disponibles pour fi. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for fi. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour gi. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for gi. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour gr. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for gr. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour is. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for is. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour li. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for li. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour lu. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for lu. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour no. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for no. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour se. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for se. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Données spécifiques non disponibles pour si. Liberté religieuse généralement garantie. Catholicisme historique en déclin progressif face à la sécularisation.":"Specific data not available for si. Religious freedom is generally guaranteed. Historic Catholicism in gradual decline in the face of secularization.",
+"Liberté religieuse constitutionnelle mais tensions dans certaines régions. Catholicisme majoritaire mais évangéliques en croissance.":"Constitutional religious freedom, but tensions in some regions. Majority Catholicism, but growing Evangelical churches.",
+"Liberté religieuse constitutionnelle. Catholicisme minoritaire (~20%) mais très diversifié. Montée de l'hostilité culturelle en certains milieux.":"Constitutional religious freedom. Minority Catholicism (~20%) but highly diverse. Rising cultural hostility in some circles.",
+"Liberté religieuse formelle mais instabilité extrême. Catholicisme très actif (~30%). Effondrement économique total.":"Formal religious freedom but extreme instability. Very active Catholicism (~30%). Total economic collapse.",
+"Liberté religieuse formelle mais instabilité extrême. Catholicisme très majoritaire et très actif. Guerres et conflits armés persistants.":"Formal religious freedom but extreme instability. A very large and very active Catholic majority. Persistent wars and armed conflicts.",
+"Liberté religieuse formelle mais violences dans les zones rurales. Catholicisme majoritaire. Présence de groupes armés.":"Formal religious freedom but violence in rural areas. Majority Catholicism. Presence of armed groups.",
+"Liberté religieuse garantie. Catholicisme majoritaire avec forte présence du Vatican. Déclin des vocations mais patrimoine ecclésial immense.":"Guaranteed religious freedom. Majority Catholicism with a strong Vatican presence. Declining vocations, but an immense ecclesial heritage.",
+"Liberté religieuse globale. Catholicisme en déclin rapide face aux évangéliques. Pays le plus peuplé d'Amérique latine.":"Broad religious freedom. Catholicism in rapid decline in the face of Evangelical churches. The most populous country in Latin America.",
+"Liberté religieuse inexistante. Catholicisme persécuté (arméniens, chaldéens). Régime théocratique islamique. Persécution systémique.":"Non-existent religious freedom. Persecuted Catholicism (Armenians, Chaldeans). Islamic theocratic regime. Systemic persecution.",
+"Liberté religieuse menacée dans le nord (insurrection islamiste). Catholicisme minoritaire (~30%).":"Religious freedom under threat in the north (Islamist insurgency). Minority Catholicism (~30%).",
+"Liberté religieuse menacée dans les régions anglophones (crise séparatiste). Catholicisme très actif (~25%).":"Religious freedom under threat in the Anglophone regions (separatist crisis). Very active Catholicism (~25%).",
+"Liberté religieuse menacée par la guerre. Catholicisme minoritaire (grec et latin). Guerre d'invasion russe depuis 2022.":"Religious freedom threatened by the war. Minority Catholicism (Greek and Latin). Russia's war of invasion since 2022.",
+"Liberté religieuse menacée. Catholicisme minoritaire mais historique (Bethléem, Jérusalem). Occupation et conflit.":"Religious freedom under threat. A minority but historic Catholicism (Bethlehem, Jerusalem). Occupation and conflict.",
+"Liberté religieuse quasi inexistante (coup d'État militaire). Catholicisme persécuté mais très résilient. Guerre civile généralisée.":"Virtually non-existent religious freedom (military coup). A persecuted but highly resilient Catholicism. Widespread civil war.",
+"Liberté religieuse quasi inexistante. Catholicisme persécuté (chaldéens, assyriens). Génocide de 2014 par Daech. Exode massif.":"Virtually non-existent religious freedom. Persecuted Catholicism (Chaldeans, Assyrians). The 2014 genocide by ISIS. A massive exodus.",
+"Liberté religieuse quasi inexistante. Catholicisme persécuté (Église patriotique contrôlée, Église souterraine). Surveillance totale.":"Virtually non-existent religious freedom. Persecuted Catholicism (state-controlled Patriotic Church, underground Church). Total surveillance.",
+"Liberté religieuse quasi inexistante. Catholicisme persécuté. Guerre civile de 12 ans. Exode massif des chrétiens.":"Virtually non-existent religious freedom. Persecuted Catholicism. Twelve years of civil war. A massive Christian exodus.",
+"Liberté religieuse quasi inexistante. Catholicisme très minoritaire (~1%). Lois sur le blasphème utilisées contre les chrétiens. Violence extrême.":"Virtually non-existent religious freedom. A very small Catholic minority (~1%). Blasphemy laws used against Christians. Extreme violence.",
+"Liberté religieuse quasi inexistante. Catholicisme très minoritaire. Guerre civile et persécution extrême des chrétiens.":"Virtually non-existent religious freedom. A very small Catholic minority. Civil war and extreme persecution of Christians.",
+"Liberté religieuse relative. Catholicisme avec forte présence des traditions indigènes. Tensions politiques.":"Relative religious freedom. Catholicism with a strong presence of indigenous traditions. Political tensions.",
+"Liberté religieuse relative. Catholicisme minoritaire (<1%). Orthodoxe majoritaire. Pays en transition.":"Relative religious freedom. Minority Catholicism (<1%). Orthodox majority. A country in transition.",
+"Liberté religieuse relative. Catholicisme minoritaire (<1%). Pays bouddhiste très majoritaire. Monarchie.":"Relative religious freedom. Minority Catholicism (<1%). An overwhelmingly Buddhist country. A monarchy.",
+"Liberté religieuse relative. Catholicisme minoritaire (arméniens-catholiques). Orthodoxe arménienne majoritaire.":"Relative religious freedom. Minority Catholicism (Armenian Catholics). Armenian Orthodox majority.",
+"Liberté religieuse relative. Catholicisme minoritaire (hongrois, croates). Orthodoxe majoritaire.":"Relative religious freedom. Minority Catholicism (Hungarians, Croats). Orthodox majority.",
+"Liberté religieuse relative. Catholicisme minoritaire (~15%). Héritage de la guerre de 1992-1995.":"Relative religious freedom. Minority Catholicism (~15%). Legacy of the 1992-1995 war.",
+"Liberté religieuse relative. Catholicisme minoritaire (~2%). Conflit israélo-palestinien. Terre sainte.":"Relative religious freedom. Minority Catholicism (~2%). The Israeli-Palestinian conflict. The Holy Land.",
+"Liberté religieuse relative. Catholicisme minoritaire (~20%) dans un pays majoritairement protestant et musulman. Tensions interreligieuses.":"Relative religious freedom. Minority Catholicism (~20%) in a mostly Protestant and Muslim country. Interreligious tensions.",
+"Liberté religieuse relative. Catholicisme minoritaire (~6%). Crise économique massive et tensions ethniques.":"Relative religious freedom. Minority Catholicism (~6%). A massive economic crisis and ethnic tensions.",
+"Liberté religieuse relative. Catholicisme minoritaire mais bien établi. Coexistence avec islam et religions traditionnelles.":"Relative religious freedom. Minority but well-established Catholicism. Coexistence with Islam and traditional religions.",
+"Liberté religieuse relative. Catholicisme minoritaire mais protégé. Pays stable au cœur d'une région en crise.":"Relative religious freedom. Minority but protected Catholicism. A stable country at the heart of a region in crisis.",
+"Liberté religieuse relative. Catholicisme minoritaire. Pays très pauvre. Tensions avec la Transnistrie.":"Relative religious freedom. Minority Catholicism. A very poor country. Tensions over Transnistria.",
+"Liberté religieuse relative. Catholicisme très majoritaire (~50%). Richesse pétrolière mal répartie.":"Relative religious freedom. A very large Catholic majority (~50%). Poorly distributed oil wealth.",
+"Liberté religieuse restreinte (régime autoritaire). Catholicisme très majoritaire mais en déclin. Génocide de 1994 toujours présent.":"Restricted religious freedom (authoritarian regime). A very large Catholic majority, but declining. The 1994 genocide is still present.",
+"Liberté religieuse restreinte (régime communiste). Catholicisme historique mais affaibli. Ouverture limitée depuis 2015.":"Restricted religious freedom (communist regime). Historic but weakened Catholicism. A limited opening since 2015.",
+"Liberté religieuse restreinte sous le régime autoritaire. Catholicisme historique. Crise humanitaire massive.":"Restricted religious freedom under the authoritarian regime. Historic Catholicism. A massive humanitarian crisis.",
+"Liberté religieuse restreinte. Catholicisme d'expatriés. Tolérance limitée.":"Restricted religious freedom. An expatriate Catholicism. Limited tolerance.",
+"Liberté religieuse restreinte. Catholicisme minoritaire (~1%). Régime autoritaire. Héritage du génocide des Khmers rouges.":"Restricted religious freedom. Minority Catholicism (~1%). An authoritarian regime. The legacy of the Khmer Rouge genocide.",
+"Liberté religieuse restreinte. Catholicisme minoritaire (~3%) dans le plus grand pays musulman du monde. Discrimination et violences sporadiques.":"Restricted religious freedom. Minority Catholicism (~3%) in the world's largest Muslim country. Discrimination and sporadic violence.",
+"Liberté religieuse restreinte. Catholicisme minoritaire (~3%). Lois sur l'islam comme religion d'État. Discrimination légale.":"Restricted religious freedom. Minority Catholicism (~3%). Laws establishing Islam as the state religion. Legal discrimination.",
+"Liberté religieuse restreinte. Catholicisme minoritaire. Lois anti-conversion. Pays hindou historique.":"Restricted religious freedom. Minority Catholicism. Anti-conversion laws. A historically Hindu country.",
+"Liberté religieuse restreinte. Catholicisme minoritaire. Régime autoritaire. Shiite majoritaire.":"Restricted religious freedom. Minority Catholicism. Authoritarian regime. Shiite majority.",
+"Liberté religieuse restreinte. Catholicisme très majoritaire (~60%). Crise politique et économique.":"Restricted religious freedom. A very large Catholic majority (~60%). Political and economic crisis.",
+"Liberté religieuse sous pression (loi anti-LGBT). Catholicisme très actif (~40%). Croissance démographique massive.":"Religious freedom under pressure (anti-LGBT law). Very active Catholicism (~40%). Massive demographic growth.",
+"Liberté religieuse sous pression politique. Catholicisme très actif. Hyperinflation et crise économique persistante.":"Religious freedom under political pressure. Very active Catholicism. Hyperinflation and a persistent economic crisis.",
+"Liberté religieuse totale (territoire US). Catholicisme historique mais en déclin. Crise économique.":"Full religious freedom (US territory). Historic but declining Catholicism. Economic crisis.",
+"Liberté religieuse totale. Catholicisme et protestantisme en déclin. Forte présence musulmane due à l'immigration.":"Full religious freedom. Catholicism and Protestantism in decline. A large Muslim presence due to immigration.",
+"Liberté religieuse totale. Catholicisme et protestantisme répartis selon les cantons. Société très prospère.":"Full religious freedom. Catholicism and Protestantism distributed across the cantons. A very prosperous society.",
+"Liberté religieuse totale. Catholicisme historique en déclin rapide. Montée de l'indifférence religieuse.":"Full religious freedom. Historic Catholicism in rapid decline. Rising religious indifference.",
+"Liberté religieuse totale. Catholicisme historique mais en déclin. Démocratie stable.":"Full religious freedom. Historic but declining Catholicism. A stable democracy.",
+"Liberté religieuse totale. Catholicisme minoritaire (~10%). Pays très sécularisé.":"Full religious freedom. Minority Catholicism (~10%). A very secularized country.",
+"Liberté religieuse totale. Catholicisme minoritaire (~20%) mais très actif. Multiculturalisme.":"Full religious freedom. Minority Catholicism (~20%) but very active. Multiculturalism.",
+"Liberté religieuse totale. Catholicisme minoritaire (~7%). Pays le plus développé d'Afrique mais inégalités extrêmes.":"Full religious freedom. Minority Catholicism (~7%). The most developed country in Africa, but extreme inequality.",
+"Liberté religieuse totale. Catholicisme minoritaire. Le pays le plus athée d'Europe.":"Full religious freedom. Minority Catholicism. The most atheist country in Europe.",
+"Liberté religieuse totale. Catholicisme minoritaire. Pays très religieux mais protestant majoritaire.":"Full religious freedom. Minority Catholicism. A very religious but mostly Protestant country.",
+"Liberté religieuse totale. Catholicisme très ancré culturellement malgré un déclin des pratiquants.":"Full religious freedom. Catholicism deeply rooted culturally, despite a decline in churchgoers.",
+"Liberté religieuse totale. Catholicisme très majoritaire (~97%). Le pays le plus catholique d'Asie. Jeune nation.":"Full religious freedom. An overwhelming Catholic majority (~97%). The most Catholic country in Asia. A young nation.",
+"Liberté religieuse totale. Catholicisme très majoritaire. Pays prospère et stable.":"Full religious freedom. A very large Catholic majority. A prosperous and stable country.",
+"Liberté religieuse totale. Catholicisme très majoritaire. Pays stable en comparaison d'Haïti.":"Full religious freedom. A very large Catholic majority. A stable country compared to Haiti.",
+"Liberté religieuse totale. Catholicisme très minoritaire (<1%). Pays très sécularisé avec traditions shintoïstes et bouddhistes.":"Full religious freedom. A very small Catholic minority (<1%). A very secularized country with Shinto and Buddhist traditions.",
+"Liberté religieuse totale. Catholicisme très minoritaire. Le pays le plus athée du monde.":"Full religious freedom. A very small Catholic minority. The most atheist country in the world.",
+"Liberté religieuse totale. Laïcité constitutionnelle. Église catholique historiquement dominante mais en déclin progressif.":"Full religious freedom. Constitutional secularism (laïcité). A historically dominant but gradually declining Catholic Church.",
+"Liberté religieuse totalement inexistante. Catholicisme interdit. Pays le plus fermé du monde religieusement. Expatriés célébrant en secret.":"Totally non-existent religious freedom. Catholicism banned. The most religiously closed country in the world. Expatriates celebrating in secret.",
+"Liberté religieuse très menacée sous le nationalisme hindou. Catholicisme minoritaire (~2%). Violence anti-chrétienne croissante.":"Religious freedom severely threatened under Hindu nationalism. Minority Catholicism (~2%). Growing anti-Christian violence.",
+"Liberté religieuse très menacée. Catholicisme majoritaire mais persécuté par les groupes armés. État en déliquescence.":"Religious freedom severely threatened. A Catholic majority persecuted by armed groups. A crumbling state.",
+"Liberté religieuse très menacée. Catholicisme persécuté par le régime d'Ortega. Église considérée comme ennemie.":"Religious freedom severely threatened. Catholicism persecuted by the Ortega regime. The Church regarded as an enemy.",
+"Liberté religieuse très menacée. Catholicisme très actif (~40%). Guerre civile chronique et famine.":"Religious freedom severely threatened. Very active Catholicism (~40%). Chronic civil war and famine.",
+"Liberté religieuse très menacée. Violence extrême entre communautés dans le nord (Boko Haram, Fulani). Catholicisme très dynamique au sud.":"Religious freedom severely threatened. Extreme intercommunal violence in the north (Boko Haram, Fulani). A very dynamic Catholicism in the south.",
+"Liberté religieuse très restreinte (régime communiste). Catholicisme persécuté mais résilient. Église souterraine.":"Severely restricted religious freedom (communist regime). Persecuted but resilient Catholicism. An underground Church.",
+"Liberté religieuse très restreinte (régime communiste). Catholicisme persécuté mais très résilient (~7%). Église souterraine active.":"Severely restricted religious freedom (communist regime). A persecuted but highly resilient Catholicism (~7%). An active underground Church.",
+"Liberté religieuse très restreinte. Catholicisme minoritaire (<1%) dans un pays musulman à 90%. Discrimination systémique contre les chrétiens.":"Severely restricted religious freedom. A tiny Catholic minority (<1%) in a 90% Muslim country. Systemic discrimination against Christians.",
+"Liberté religieuse très restreinte. Catholicisme minoritaire (<1%). Pressions islamistes croissantes.":"Severely restricted religious freedom. A tiny Catholic minority (<1%). Growing Islamist pressure.",
+"Liberté religieuse très restreinte. Catholicisme minoritaire (~10%). Dictature de Loukachenko. Église catholique persécutée.":"Severely restricted religious freedom. Minority Catholicism (~10%). The Lukashenko dictatorship. A persecuted Catholic Church.",
+"Liberté religieuse très restreinte. Catholicisme minoritaire dans un pays orthodoxe historique. Conflits ethniques et guerre civile récente.":"Severely restricted religious freedom. Minority Catholicism in a historically Orthodox country. Ethnic conflicts and a recent civil war.",
+"Liberté religieuse très restreinte. Catholicisme persécuté (arméniens, syriaques). Nationalisme turc et islam politique.":"Severely restricted religious freedom. Persecuted Catholicism (Armenians, Syriacs). Turkish nationalism and political Islam.",
+"Liberté religieuse très restreinte. Catholicisme persécuté (minoritaire). Loi anti-missionnaire. Orthodoxe russe privilégiée.":"Severely restricted religious freedom. Persecuted (minority) Catholicism. An anti-missionary law. Privileged Russian Orthodoxy.",
+"Liberté religieuse. Catholicisme en déclin rapide après les scandales. Société très sécularisée.":"Religious freedom. Catholicism in rapid decline after the scandals. A highly secularized society.",
+"Liberté religieuse. Catholicisme et protestantisme historiques. Société stable mais en déclin religieux.":"Religious freedom. Historic Catholicism and Protestantism. A stable society, but in religious decline.",
+"Liberté religieuse. Catholicisme historique (francophone) en déclin. Multiculturalisme affirmé.":"Religious freedom. Historic (Francophone) Catholicism in decline. Assertive multiculturalism.",
+"Liberté religieuse. Catholicisme historique en déclin très rapide. Un des pays les plus sécularisés d'Europe.":"Religious freedom. Historic Catholicism in very rapid decline. One of the most secularized countries in Europe.",
+"Liberté religieuse. Catholicisme historique mais en déclin. Nationalisme croissant sous Orban.":"Religious freedom. Historic but declining Catholicism. Rising nationalism under Orban.",
+"Liberté religieuse. Catholicisme historique mais évangéliques en forte croissance. Violence des gangs.":"Religious freedom. Historic Catholicism, but rapidly growing Evangelical churches. Gang violence.",
+"Liberté religieuse. Catholicisme historique. Réduction drastique de la violence sous Bukele.":"Religious freedom. Historic Catholicism. A drastic reduction in violence under Bukele.",
+"Liberté religieuse. Catholicisme historique. Violence des gangs et pauvreté.":"Religious freedom. Historic Catholicism. Gang violence and poverty.",
+"Liberté religieuse. Catholicisme historiquement dominant en effondrement rapide après les scandales.":"Religious freedom. A historically dominant Catholicism collapsing rapidly after the scandals.",
+"Liberté religieuse. Catholicisme historiquement dominant mais en déclin. Crise économique persistante.":"Religious freedom. Historically dominant but declining Catholicism. A persistent economic crisis.",
+"Liberté religieuse. Catholicisme majoritaire avec forte présence des communautés indigènes. Tensions sociales.":"Religious freedom. Majority Catholicism with a strong presence of indigenous communities. Social tensions.",
+"Liberté religieuse. Catholicisme majoritaire mais en déclin. Pays très conservateur sur les valeurs.":"Religious freedom. A Catholic majority, but declining. A very conservative country on values.",
+"Liberté religieuse. Catholicisme majoritaire. Tensions sociales et indigènes.":"Religious freedom. Majority Catholicism. Social and indigenous tensions.",
+"Liberté religieuse. Catholicisme minoritaire (hongrois, grecs-catholiques). Orthodoxe majoritaire.":"Religious freedom. Minority Catholicism (Hungarians, Greek Catholics). Orthodox majority.",
+"Liberté religieuse. Catholicisme minoritaire (~10%) dans un pays très religieux. Démocratie stable.":"Religious freedom. Minority Catholicism (~10%) in a very religious country. A stable democracy.",
+"Liberté religieuse. Catholicisme minoritaire (~10%). Pays majoritairement musulman laïc.":"Religious freedom. Minority Catholicism (~10%). A majority-Muslim secular country.",
+"Liberté religieuse. Catholicisme minoritaire (~20%). Pays pétrolier multiculturel.":"Religious freedom. Minority Catholicism (~20%). A multicultural oil-producing country.",
+"Liberté religieuse. Catholicisme minoritaire (~20%). Protestantisme et orthodoxie majoritaires.":"Religious freedom. Minority Catholicism (~20%). Protestant and Orthodox majorities.",
+"Liberté religieuse. Catholicisme minoritaire historique. Présence importante d'immigrants catholiques.":"Religious freedom. A historic minority Catholicism. A significant presence of Catholic immigrants.",
+"Liberté religieuse. Catholicisme minoritaire mais dynamique (~10%). Pays très développé avec forte croissance des églises.":"Religious freedom. A minority but dynamic Catholicism (~10%). A highly developed country with strong church growth.",
+"Liberté religieuse. Catholicisme très actif (~20%). Un des pays les plus pauvres du monde.":"Religious freedom. Very active Catholicism (~20%). One of the poorest countries in the world.",
+"Liberté religieuse. Catholicisme très actif (~30%). Démocratie stable mais économie fragile.":"Religious freedom. Very active Catholicism (~30%). A stable democracy but a fragile economy.",
+"Liberté religieuse. Catholicisme très actif (~30%). Stabilité relative après les crises politiques.":"Religious freedom. Very active Catholicism (~30%). Relative stability after the political crises.",
+"Liberté religieuse. Catholicisme très ancré (~25%). Pauvreté massive et instabilité politique.":"Religious freedom. Deeply rooted Catholicism (~25%). Massive poverty and political instability.",
+"Liberté religieuse. Catholicisme très majoritaire (~25%). Pays très divers ethniquement.":"Religious freedom. A very large Catholic presence (~25%). An ethnically very diverse country.",
+"Liberté religieuse. Catholicisme très majoritaire (~75%). Forte identité catholique résistante au communisme.":"Religious freedom. An overwhelming Catholic majority (~75%). A strong Catholic identity that resisted communism.",
+"Liberté religieuse. Catholicisme très majoritaire (~80%). Seul pays catholique d'Asie. Déclin des pratiquants.":"Religious freedom. An overwhelming Catholic majority (~80%). The only Catholic country in Asia. Declining churchgoing.",
+"Liberté religieuse. Catholicisme très majoritaire (~85%). Forte identité catholique post-guerre.":"Religious freedom. An overwhelming Catholic majority (~85%). A strong post-war Catholic identity.",
+"Liberté religieuse. Catholicisme très majoritaire et culturellement dominant. Déclin des pratiquants mais forte identité catholique.":"Religious freedom. An overwhelming and culturally dominant Catholic majority. Declining churchgoing, but a strong Catholic identity.",
+"Liberté religieuse. Catholicisme très majoritaire mais concurrence du vaudou. Effondrement de l'État.":"Religious freedom. A very large Catholic majority, but competition from Vodou. State collapse.",
+"Liberté religieuse. Catholicisme très majoritaire. Pays le plus homogène religieusement d'Amérique du Sud.":"Religious freedom. A very large Catholic majority. The most religiously homogeneous country in South America.",
+"Liberté religieuse. Catholicisme très minoritaire (<1%). Orthodoxe majoritaire. Pays le plus pauvre de l'UE.":"Religious freedom. A tiny Catholic minority (<1%). Orthodox majority. The poorest country in the EU.",
+"Liberté religieuse. Le pays le plus sécularisé d'Amérique latine. Catholicisme minoritaire.":"Religious freedom. The most secularized country in Latin America. Minority Catholicism.",
+"Liberté religieuse. Pays historiquement calviniste puis très sécularisé. Catholicisme minoritaire mais actif.":"Religious freedom. A historically Calvinist, then highly secularized, country. A minority but active Catholicism.",
+};
+
+
+/* --- contenu anglais de la fenêtre d'information --- */
+const INFO_EN = {
+ 'info-apropos':`<p>World map of <b>3,220 Catholic ecclesiastical circumscriptions</b> (dioceses, archdioceses, missions, prelatures…). Click a point to open its <b>full pastoral report</b>, generated live by the Carta Pastorale API: statistics, trends, indicators, country context, discernment pathways.</p>
+   <h4>This tool IS</h4>
+   <ul><li>A reference map of ecclesiastical circumscriptions</li>
+   <li>An educational support for training and pastoral discernment</li>
+   <li>Based on public, verifiable data (see the Sources tab)</li>
+   <li>A personal project with no institutional affiliation</li></ul>
+   <h4>This tool IS NOT</h4>
+   <ul><li>An official document of the Holy See, nor a source of canon law</li>
+   <li>Precise geolocation: about 240 positions are <b>approximate</b> (dashed markers, centered on the country)</li>
+   <li>Necessarily exhaustive: some recent missions may be missing</li></ul>`,
+ 'info-sources':`<div class="src-card"><b>GCatholic.org</b>
+   <p>Primary source: worldwide database of ecclesiastical structures (Catholics, priests, parishes, history).</p>
+   <a href="https://gcatholic.org" target="_blank" rel="noopener">gcatholic.org ↗</a></div>
+   <div class="src-card"><b>Carta Pastorale API</b>
+   <p>Pastoral reports served live: indicators, trends, country context (HDI, GDP, religious freedom).</p>
+   <a href="https://carta-pastorale.onrender.com" target="_blank" rel="noopener">carta-pastorale.onrender.com ↗</a></div>
+   <div class="src-card"><b>Catholic-Hierarchy.org</b>
+   <p>Independent directory of dioceses and bishops, maintained by David M. Cheney.</p>
+   <a href="https://www.catholic-hierarchy.org" target="_blank" rel="noopener">catholic-hierarchy.org ↗</a></div>
+   <div class="src-card"><b>Annuario Pontificio &amp; Annus Statisticus Ecclesiae</b>
+   <p>Official yearbook of the Holy See and annual statistical compendium (Libreria Editrice Vaticana).</p></div>
+   <div class="src-card"><b>OpenStreetMap &amp; Leaflet</b>
+   <p>Open basemap © OpenStreetMap contributors (ODbL) · open-source Leaflet map engine.</p>
+   <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">openstreetmap.org/copyright ↗</a> &nbsp;
+   <a href="https://leafletjs.com" target="_blank" rel="noopener">leafletjs.com ↗</a></div>`,
+ 'info-conf':`<ul>
+   <li><b>No cookies</b>, no trackers, no user accounts.</li>
+   <li><b>No personal data</b> is collected, stored or sold — only your language preference is remembered on your device.</li>
+   <li><b>Search</b> runs locally, in your browser.</li>
+   <li>Clicking a record queries the API (carta-pastorale.onrender.com): as with any web visit, that server may log a technical IP address, without profiling.</li>
+   <li>Your <b>geolocation is never requested</b>.</li>
+   <li>The <b>source code is readable</b>: right-click → "View page source".</li></ul>`,
+ 'info-projets':`<div class="verse">"Love and faithfulness meet together, righteousness and peace kiss each other."
+   <span>— Psalm 85:10 · the thread connecting these four projects</span></div>
+   <div class="proj-grid">
+   <div class="proj-card"><b>🧭 Le Bon Alignement</b>
+     <span class="vtag">"Love and faithfulness meet"</span>
+     <p>Free, 100% confidential ethical discernment tool: name what is at stake in your choices.</p>
+     <a href="https://lebon-juste-alignement.netlify.app/" target="_blank" rel="noopener">Visit ↗</a></div>
+   <div class="proj-card"><b>🏠 Au Foyer de l'Amour</b>
+     <span class="vtag">"Righteousness and peace kiss"</span>
+     <p>Spiritual discernment and "little light": texts to meditate, prayers, Ignatian exercises, listening.</p>
+     <a href="https://amour-et-verite-app.netlify.app/" target="_blank" rel="noopener">Visit ↗</a></div>
+   <div class="proj-card"><b>⚖️ Justice AI</b>
+     <p>AI-powered, anonymous and free legal guidance: understand your rights, for educational purposes.</p>
+     <a href="https://justice-ai-anonyme-2.onrender.com/" target="_blank" rel="noopener">Visit ↗</a></div>
+   <div class="proj-card"><b>🌉 ONBRIDGE AI</b>
+     <p>A bridge between your projects and artificial intelligence.</p>
+     <a href="https://bridge-your-project.lovable.app/" target="_blank" rel="noopener">Visit ↗</a></div>
+   </div>`
+};
+let INFO_FR = null;
+
+function setLang(l){
+  LANG = l;
+  try{ localStorage.setItem('cp_lang', l); }catch(e){}
+  applyLang();
+}
+function renderLegend(){
+  document.getElementById('legend').innerHTML = T().legend.map(([c,txt,ap]) =>
+    `<div class="row"><span class="dot${ap?' approx':''}" style="background:${c}"></span>${txt}</div>`).join('');
+}
+function renderInfoModal(){
+  if(!INFO_FR){
+    INFO_FR = {};
+    document.querySelectorAll('.info-tab').forEach(d => INFO_FR[d.id] = d.innerHTML);
+  }
+  const src = LANG==='en' ? INFO_EN : INFO_FR;
+  for(const id in src){
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = src[id];
+  }
+  document.querySelectorAll('#infoTabs button').forEach(b => b.textContent = T().tabs[b.dataset.t] || b.textContent);
+}
+function applyLang(){
+  const t = T();
+  document.documentElement.lang = LANG;
+  document.title = t.title;
+  document.getElementById('ctrlSub').textContent = t.subtitle;
+  document.getElementById('q').placeholder = t.searchPh;
+  document.getElementById('infoBtn').title = t.infoTitle;
+  document.getElementById('close').title = t.closeTitle;
+  document.getElementById('langBtn').textContent = LANG==='fr' ? 'EN' : 'FR';
+  buildChips();
+  renderLegend();
+  renderInfoModal();
+  renderMarkers(curCont);
+  if(lastDetail) renderDetail(lastDetail.j, lastDetail.d);
+}
+
+const API = 'https://carta-pastorale.onrender.com';
+const API_KEY = ''; // ← collez votre clé API ici si un jour l'API la demande (envoyée en en-tête X-API-Key)
+const API_HEADERS = API_KEY ? {'X-API-Key': API_KEY} : {};
+
+/* --- index des données embarquées --- */
+const ALL = DIOCESES.map(r => ({id:r[0], nom:r[1], pays:r[2], cont:r[3], cat:r[4],
+                                cath:r[5], pct:r[6], lat:r[7], lng:r[8], exact:r[9]===1}));
+const BY_ID = Object.fromEntries(ALL.map(d => [d.id, d]));
+const norm = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const fmt = n => (n==null ? '—' : n.toLocaleString(LOC()));
+const compact = n => n==null ? '—' : (Math.abs(n)>=1e6 ? (n/1e6).toLocaleString(LOC(),{minimumFractionDigits:2,maximumFractionDigits:2})+' M'
+                                      : n.toLocaleString(LOC()));
+const fmtPct = n => n==null ? '—' : n.toLocaleString(LOC(),{minimumFractionDigits:0,maximumFractionDigits:1});
+const esc = s => String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const md = s => esc(s).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+
+const CAT_COLOR = c => ({
+  'archidiocèse métropolitain':'#dc2626',
+  'archidiocèse':'#f59e0b',
+  'diocèse':'#2563eb',
+  'administration apostolique':'#0d9488',
+  'autre':'#0d9488'
+}[c] || '#9ca3af');
+
+/* --- carte --- */
+const map = L.map('map', {worldCopyJump:true, minZoom:2, zoomControl:false}).setView([22, 8], 2.4);
+L.control.zoom({position:'bottomright'}).addTo(map);
+const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom:18, zIndex:2, attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · données : API Carta Pastorale (GCatholic)'
+}).addTo(map);
+
+/* --- fond autonome sous OSM + bascule hors ligne si OSM ne répond pas --- */
+let osmOk = false;
+osm.on('tileload', () => { osmOk = true; });
+addAutonomousGrid();
+setTimeout(() => {
+  if (!osmOk) {
+    map.removeLayer(osm);
+    addContinents();
+    L.control.attribution({prefix:false}).addAttribution('données : API Carta Pastorale (GCatholic)').addTo(map);
+    toast(T().offlineMap);
+  }
+}, 8000);
+
+function addAutonomousGrid(){
+  L.GridLayer.AutonomousMap = L.GridLayer.extend({
+    createTile: function(coords){
+      const tile = document.createElement('canvas');
+      const ts = this.getTileSize();
+      tile.setAttribute('width', ts.x); tile.setAttribute('height', ts.y);
+      const ctx = tile.getContext('2d');
+      ctx.fillStyle = '#c5e3ec'; ctx.fillRect(0, 0, ts.x, ts.y);
+      const s = ts.x, n = Math.pow(2, coords.z);
+      const nwLng = coords.x / n * 360 - 180;
+      const nwLatR = Math.atan(Math.sinh(Math.PI * (1 - 2 * coords.y / n)));
+      const seLatR = Math.atan(Math.sinh(Math.PI * (1 - 2 * (coords.y + 1) / n)));
+      const per = 360 / n;
+      const merc = la => Math.log(Math.tan(la / 2 + Math.PI / 4));
+      const latY = la => ((merc(la * Math.PI / 180) - merc(nwLatR)) / (merc(seLatR) - merc(nwLatR))) * s;
+      const lngX = ln => ((ln - nwLng) / per) * s;
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 0.8;
+      for (let ln = Math.ceil(nwLng / 10) * 10; ln < nwLng + per; ln += 10) {
+        const px = lngX(ln); ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, s); ctx.stroke();
+      }
+      const nwLat = nwLatR * 180 / Math.PI, seLat = seLatR * 180 / Math.PI;
+      for (let la = Math.ceil(nwLat / 10) * 10; la > seLat - 5; la -= 10) {
+        const py = latY(la);
+        if (py >= -10 && py <= s + 10) { ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(s, py); ctx.stroke(); }
+      }
+      return tile;
+    }
+  });
+  const g = new L.GridLayer.AutonomousMap({zIndex: 1});
+  g.addTo(map);
+}
+
+function addContinents(){
+  const CONT = [
+    [[75,-170],[75,-50],[60,-50],[60,-80],[50,-60],[45,-55],[40,-70],[35,-75],[25,-80],[20,-105],[15,-90],[10,-85],[5,-78],[8,-60],[15,-60],[25,-80],[30,-115],[35,-120],[40,-125],[45,-125],[50,-130],[55,-135],[60,-140],[65,-165],[70,-170],[75,-170]],
+    [[15,-60],[5,-50],[0,-50],[-5,-35],[-10,-35],[-15,-40],[-20,-40],[-25,-45],[-30,-50],[-35,-55],[-40,-65],[-45,-65],[-50,-75],[-55,-70],[-55,-65],[-50,-70],[-45,-75],[-40,-73],[-35,-72],[-30,-71],[-25,-70],[-20,-70],[-15,-75],[-10,-78],[-5,-80],[0,-80],[5,-78],[10,-75],[12,-77],[12,-72],[10,-60],[15,-60]],
+    [[70,-25],[70,30],[65,30],[65,40],[60,45],[55,50],[50,40],[45,40],[40,30],[35,25],[35,15],[40,10],[45,0],[50,-10],[55,-10],[60,0],[65,10],[70,-10],[70,-25]],
+    [[35,-10],[40,10],[35,25],[30,30],[25,35],[20,35],[15,15],[10,15],[5,10],[0,10],[-5,12],[-10,15],[-15,12],[-20,17],[-25,15],[-30,17],[-35,20],[-30,30],[-25,32],[-20,35],[-15,35],[-10,40],[-5,40],[0,45],[5,45],[10,50],[15,50],[20,45],[25,40],[30,35],[35,30],[35,-10]],
+    [[75,30],[75,60],[70,60],[70,100],[65,100],[65,120],[60,120],[60,140],[55,140],[55,160],[50,160],[50,140],[45,140],[45,130],[40,130],[40,120],[35,120],[35,110],[30,110],[30,100],[25,100],[25,90],[20,90],[20,80],[15,80],[10,80],[10,75],[8,78],[8,92],[10,100],[15,105],[20,110],[25,115],[30,120],[35,125],[40,130],[45,135],[50,140],[55,145],[60,150],[65,170],[70,180],[75,180],[75,30]],
+    [[-10,115],[-15,115],[-20,115],[-25,115],[-30,115],[-35,115],[-40,115],[-40,140],[-35,145],[-30,150],[-25,150],[-20,148],[-15,145],[-10,140],[-10,115]],
+    [[85,-75],[85,-10],[80,-10],[80,-20],[75,-20],[75,-30],[70,-30],[70,-40],[65,-40],[65,-50],[70,-50],[70,-60],[75,-60],[75,-70],[80,-70],[80,-75],[85,-75]],
+    [[60,-11],[58,-4],[55,-6],[52,-5],[50,-5],[50,-10],[52,-10],[55,-8],[58,-11],[60,-11]],
+    [[46,140],[44,143],[40,140],[35,136],[33,130],[35,129],[38,140],[42,141],[46,140]],
+    [[-34,172],[-37,175],[-42,174],[-47,166],[-47,168],[-42,172],[-37,177],[-34,172]],
+    [[-12,43],[-16,44],[-20,44],[-25,47],[-26,44],[-24,43],[-20,43],[-16,43],[-12,43]],
+    [[5,95],[5,140],[0,140],[0,130],[-5,130],[-5,140],[-10,140],[-10,150],[-5,150],[0,150],[5,150],[5,95]],
+    [[20,120],[18,122],[15,121],[12,125],[10,120],[12,118],[15,120],[18,119],[20,120]]
+  ];
+  CONT.forEach(poly => L.polygon(poly, {color:'#8fbfa0', weight:1, fillColor:'#b8d4c2', fillOpacity:0.6, interactive:false}).addTo(map));
+}
+
+const cluster = L.markerClusterGroup({
+  chunkedLoading:true, chunkInterval:60, chunkDelay:20,
+  disableClusteringAtZoom:9, spiderfyOnMaxZoom:true, maxClusterRadius:46
+});
+map.addLayer(cluster);
+const MARKERS = {};
+
+function iconFor(d){
+  const c = CAT_COLOR(d.cat);
+  const s = d.exact ? 13 : 11;
+  return L.divIcon({className:'', iconSize:[s,s], iconAnchor:[s/2,s/2],
+    html:`<div class="mk ${d.exact?'':'approx'}" style="width:${s}px;height:${s}px;background:${c}"></div>`});
+}
+function renderMarkers(cont){
+  cluster.clearLayers();
+  for(const k in MARKERS) delete MARKERS[k];
+  const batch = [];
+  for(const d of ALL){
+    if(d.lat==null) continue;
+    if(cont && d.cont!==cont) continue;
+    const m = L.marker([d.lat, d.lng], {icon:iconFor(d), title:d.nom});
+    m.bindTooltip(`<b>${esc(d.nom)}</b> — ${esc(d.pays)}${d.exact?'':'<br><i style="color:#b45309">'+T().approx+'</i>'}`,
+                  {direction:'top', offset:[0,-6]});
+    m.on('click', () => openPanel(d.id));
+    MARKERS[d.id] = m;
+    batch.push(m);
+  }
+  cluster.addLayers(batch);
+  updateStats(cont);
+}
+function updateStats(cont){
+  const shown = Object.keys(MARKERS).length;
+  const exact = ALL.filter(d=>d.exact).length;
+  document.getElementById('statsTxt').textContent = T().stats(shown, exact, ALL.length);
+}
+
+/* --- filtres continent --- */
+const CONTS = ['Tous','Afrique','Amérique du Nord','Amérique latine','Asie','Europe','Océanie','Autre'];
+let curCont = '';
+function buildChips(){
+  const chipsEl = document.getElementById('chips');
+  chipsEl.innerHTML = '';
+  for(const c of CONTS){
+    const b = document.createElement('button');
+    const isOn = (c==='Tous') ? !curCont : (c===curCont);
+    b.className = 'chip' + (isOn ? ' on' : '');
+    b.textContent = T().conts[c] || c;
+    b.onclick = () => {
+      curCont = (c==='Tous') ? '' : c;
+      chipsEl.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');
+      renderMarkers(curCont);
+    };
+    chipsEl.appendChild(b);
+  }
+}
+
+/* --- recherche --- */
+const q = document.getElementById('q'), sugg = document.getElementById('sugg');
+q.addEventListener('input', () => {
+  const v = norm(q.value.trim());
+  if(v.length < 2){ sugg.style.display='none'; return; }
+  const hits = ALL.filter(d => norm(d.nom).includes(v) || norm(d.pays).includes(v)).slice(0, 8);
+  if(!hits.length){ sugg.style.display='none'; return; }
+  sugg.innerHTML = hits.map(d =>
+    `<div class="it" data-id="${d.id}"><span>${esc(d.nom)}${d.lat==null?' <span class="nopos">· '+T().noPos+'</span>':''}</span><span class="pays">${esc(d.pays)}</span></div>`).join('');
+  sugg.style.display = 'block';
+  sugg.querySelectorAll('.it').forEach(el => el.onclick = () => {
+    sugg.style.display='none'; q.value = BY_ID[el.dataset.id].nom; selectDiocese(el.dataset.id);
+  });
+});
+q.addEventListener('keydown', e => {
+  if(e.key === 'Enter'){
+    const v = norm(q.value.trim());
+    const hit = ALL.find(d => norm(d.nom) === v) || ALL.find(d => norm(d.nom).includes(v));
+    if(hit){ sugg.style.display='none'; selectDiocese(hit.id); }
+  }
+  if(e.key === 'Escape') sugg.style.display='none';
+});
+document.addEventListener('click', e => { if(!sugg.contains(e.target) && e.target!==q) sugg.style.display='none'; });
+
+function selectDiocese(id){
+  const d = BY_ID[id];
+  if(!d) return;
+  try{ history.replaceState(null, '', '#d=' + id); }catch(e){}
+  if(d.lat != null){
+    map.flyTo([d.lat, d.lng], 8, {duration:1.1});
+    setTimeout(() => { const m = MARKERS[id]; if(m) cluster.zoomToShowLayer(m, () => m.openTooltip()); }, 1200);
+  } else {
+    toast(T().noPosToast(d.nom));
+  }
+  openPanel(id);
+}
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 3200);
+}
+
+/* --- panneau latéral --- */
+const panel = document.getElementById('panel'), pbody = document.getElementById('pbody');
+document.getElementById('close').onclick = () => panel.classList.remove('open');
+document.addEventListener('keydown', e => { if(e.key==='Escape') panel.classList.remove('open'); });
+
+let fetchTimer = null;
+function openPanel(id){
+  const d = BY_ID[id];
+  panel.classList.add('open');
+  document.getElementById('pTitle').textContent = d.nom;
+  document.getElementById('pMeta').textContent = `${d.pays} · ${d.cont}`;
+  document.getElementById('pBadge').textContent = d.cat;
+  pbody.innerHTML = `<div class="loading"><div class="spin"></div>
+    Chargement du rapport pastoral…<br>
+    <span style="font-size:11px" id="wake">(le serveur peut mettre ~1 min à se réveiller — <span id="elapsed">0</span> s)</span></div>`;
+  let sec = 0;
+  clearInterval(fetchTimer);
+  fetchTimer = setInterval(() => { const e=document.getElementById('elapsed'); if(e) e.textContent = ++sec; }, 1000);
+  fetchDetail(id, d, 0);
+}
+async function fetchDetail(id, d, attempt){
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 85000);
+  try{
+    const r = await fetch(`${API}/dioceses/${encodeURIComponent(id)}`, {signal: ctrl.signal, headers: API_HEADERS});
+    clearTimeout(to);
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    clearInterval(fetchTimer);
+    setApiStatus(true);
+    lastDetail = {j, d};
+    renderDetail(j, d);
+  }catch(err){
+    clearTimeout(to);
+    if(attempt < 1){ fetchDetail(id, d, attempt+1); return; }
+    clearInterval(fetchTimer);
+    pbody.innerHTML = `<div class="err">${T().errApi}<br>
+      <span style="font-size:11px">${esc(String(err))}</span><br>
+      <button onclick="openPanel('${id}')">${T().retry}</button></div>
+      ${summaryFallback(d)}`;
+  }
+}
+function setApiStatus(on){
+  const el = document.getElementById('apiStatus');
+  if(el) el.className = on ? 'on' : '';
+  if(el) el.id = 'apiStatus';
+}
+
+function summaryFallback(d){
+  return `<div class="sec" style="margin-top:14px"><h3>Données hors ligne</h3>
+    <div class="cards">
+      <div class="card"><div class="v">${compact(d.cath)}</div><div class="l">Catholiques</div></div>
+      <div class="card"><div class="v">${d.pct!=null?d.pct+' %':'—'}</div><div class="l">% catholiques</div></div>
+      <div class="card"><div class="v">${esc(d.cat)}</div><div class="l">Catégorie</div></div>
+    </div></div>`;
+}
+
+function card(v, l){ return `<div class="card"><div class="v">${v}</div><div class="l">${l}</div></div>`; }
+
+function renderDetail(j, d){
+  const t = T(), L = t.L;
+  document.getElementById('pTitle').textContent = j.nom || d.nom;
+  document.getElementById('pMeta').textContent = LANG==='en'
+    ? `${d.pays} · ${trCont(j.continent || d.cont)}`
+    : `${j.pays_nom || d.pays} · ${j.continent ? trCont(j.continent) : trCont(d.cont)}`;
+  document.getElementById('pBadge').textContent = trCat(j.categorie || d.cat) + (j.annee_donnees ? ` · ${t.dataYear(j.annee_donnees)}` : '');
+
+  let h = '';
+
+  /* territoire & ressources */
+  const te = j.territoire || {}, r = j.ressources || {};
+  const cards = [];
+  if(te.catholiques!=null)        cards.push(card(compact(te.catholiques),L.cath));
+  if(te.pourcentage_catholiques!=null) cards.push(card(fmtPct(te.pourcentage_catholiques)+' %',L.pcath));
+  if(te.population_totale!=null)  cards.push(card(compact(te.population_totale),L.pop));
+  if(te.superficie_km2!=null)     cards.push(card(compact(te.superficie_km2)+' km²',L.sup));
+  if(r.total_pretres!=null)       cards.push(card(fmt(r.total_pretres),L.pretres));
+  if(r.paroisses!=null)           cards.push(card(fmt(r.paroisses),L.paroisses));
+  if(r.pretres_diocesains!=null)  cards.push(card(fmt(r.pretres_diocesains),L.pdio));
+  if(r.pretres_religieux!=null)   cards.push(card(fmt(r.pretres_religieux),L.prel));
+  if(r.religieuses!=null)         cards.push(card(fmt(r.religieuses),L.religieuses));
+  if(r.diacres_permanents!=null)  cards.push(card(fmt(r.diacres_permanents),L.diacres));
+  if(cards.length) h += `<div class="sec"><h3>${t.secKeys}</h3><div class="cards">${cards.join('')}</div></div>`;
+
+  /* évolution */
+  if(Array.isArray(j.tendances) && j.tendances.length >= 2)
+    h += `<div class="sec"><h3>${t.secTrend}</h3>${drawTrend(j.tendances)}</div>`;
+
+  /* indicateurs */
+  if(Array.isArray(j.indicateurs) && j.indicateurs.length){
+    h += `<div class="sec"><h3>${t.secInd}</h3>` + j.indicateurs.map(i =>
+      `<div class="ind"><div class="t"><span>${esc(trInd(i.nom))}</span><span class="val">${fmt(i.valeur)} ${esc(trUnite(i.unite||''))}</span></div>
+       <div class="ref">${t.refMonde} : ${fmt(i.ref_monde)} ${esc(trUnite(i.unite||''))}</div>
+       <div class="interp">${esc(trInterp(i.interpretation))}</div></div>`).join('') + `</div>`;
+  }
+
+  /* contexte pays */
+  const ctx = [];
+  if(j.idh!=null){
+    const c = j.idh>=0.8?'#16a34a':j.idh>=0.7?'#65a30d':j.idh>=0.55?'#d97706':'#dc2626';
+    ctx.push(`<div class="kv"><span>${L.idh}</span><b style="color:${c}">${j.idh}</b></div>`);
+  }
+  if(j.pib_par_habitant!=null) ctx.push(`<div class="kv"><span>${L.pib}</span><b>${fmt(j.pib_par_habitant)} $</b></div>`);
+  if(j.taux_urbanisation!=null) ctx.push(`<div class="kv"><span>${L.urb}</span><b>${j.taux_urbanisation} %</b></div>`);
+  if(j.indice_liberte_religion!=null) ctx.push(`<div class="kv"><span>${L.lib}</span><b>${esc(j.indice_liberte_religion)}</b></div>`);
+  if(j.score_persecution!=null){
+    const s = j.score_persecution;
+    const c = s===0?'#16a34a':s<=25?'#65a30d':s<=50?'#d97706':'#dc2626';
+    ctx.push(`<div class="kv"><span>${L.pers}</span><b style="color:${c}">${s}/100</b></div>`);
+  }
+  if(ctx.length || j.contexte_liberte || (j.defis_liberte||[]).length){
+    h += `<div class="sec"><h3>${t.secCtx}</h3>`;
+    if(ctx.length) h += ctx.join('');
+    const ctxLib = LANG==='en' ? (j.contexte_liberte_en || CTX_EN[j.contexte_liberte] || j.contexte_liberte) : j.contexte_liberte;
+    if(ctxLib) h += `<div class="ctx" style="margin-top:8px">${esc(ctxLib)}</div>`;
+    if((j.defis_liberte||[]).length)
+      h += `<div style="margin-top:8px">${j.defis_liberte.map(x=>`<span class="pill">${esc(trDefi(x))}</span>`).join('')}</div>`;
+    h += `</div>`;
+  }
+
+  /* pistes & questions */
+  if((j.pistes||[]).length)
+    h += `<div class="sec"><h3>${t.secPistes}</h3><ul class="pistes">${j.pistes.map(p=>`<li>${md(trPiste(p))}</li>`).join('')}</ul></div>`;
+  if((j.questions||[]).length)
+    h += `<div class="sec"><h3>${t.secQuest}</h3><ul class="quests">${j.questions.map(p=>`<li>❝ ${md(trQuest(p))} ❞</li>`).join('')}</ul></div>`;
+
+  /* pied */
+  h += `<div class="foot">
+    ${t.src} : ${esc(j.source||'GCatholic.org')}${j.derniere_mise_a_jour?` · ${t.maj} ${esc(j.derniere_mise_a_jour)}`:''}
+    ${j.code_gcatholic?`<br><a href="https://gcatholic.org/dioceses/diocese/${esc(j.code_gcatholic)}.htm" target="_blank" rel="noopener">${t.gcath}</a>`:''}
+    <br>${t.served}
+  </div>`;
+
+  pbody.innerHTML = h;
+}
+
+/* --- graphique d'évolution : 3 séries indexées base 100 --- */
+function drawTrend(tend){
+  const W=344, H=170, P={l:8,r:8,t:14,b:22};
+  const years = tend.map(t=>t.annee);
+  const series = [
+    {k:'catholiques', c:'#2563eb', label:T().trend.catholiques},
+    {k:'pretres',     c:'#dc2626', label:T().trend.pretres},
+    {k:'seminaristes',c:'#16a34a', label:T().trend.seminaristes},
+  ].map(s => {
+    const pts = tend.map(t => t[s.k]).filter(v => v!=null);
+    if(pts.length < 2 || !pts[0]) return null;
+    return {...s, vals: tend.map(t => t[s.k]!=null ? 100*t[s.k]/pts[0] : null),
+            first: pts[0], last: pts[pts.length-1]};
+  }).filter(Boolean);
+  if(!series.length) return '';
+
+  const all = series.flatMap(s=>s.vals).filter(v=>v!=null);
+  const mn = Math.min(...all, 100), mx = Math.max(...all, 100);
+  const pad = (mx-mn)*0.12 || 1;
+  const y = v => P.t + (H-P.t-P.b) * (1 - (v-(mn-pad))/((mx+pad)-(mn-pad)));
+  const x = i => P.l + (W-P.l-P.r) * (years.length>1 ? i/(years.length-1) : 0.5);
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">`;
+  svg += `<line x1="${P.l}" y1="${y(100)}" x2="${W-P.r}" y2="${y(100)}" stroke="#cbd5e1" stroke-dasharray="3 3"/>`;
+  series.forEach(s => {
+    const pts = s.vals.map((v,i)=>v!=null?[x(i),y(v)]:null).filter(Boolean);
+    svg += `<polyline points="${pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')}" fill="none" stroke="${s.c}" stroke-width="2.2" stroke-linejoin="round"/>`;
+    pts.forEach(p => svg += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${s.c}"/>`);
+  });
+  years.forEach((yr,i) => {
+    svg += `<text x="${x(i)}" y="${H-7}" font-size="9.5" fill="#64748b" text-anchor="middle">${yr}</text>`;
+  });
+  svg += `</svg>`;
+  svg += `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;font-size:11px;color:#475569">` +
+    series.map(s=>`<span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${s.c};margin-right:4px"></span>${s.label} <b>${compact(s.first)} → ${compact(s.last)}</b></span>`).join('') +
+    `</div>`;
+  return svg;
+}
+
+/* --- rafraîchissement en arrière-plan depuis l'API --- */
+(async function refreshFromApi(){
+  try{
+    const ctrl = new AbortController();
+    setTimeout(()=>ctrl.abort(), 95000);
+    const r = await fetch(API + '/dioceses', {signal:ctrl.signal, headers: API_HEADERS});
+    if(!r.ok) return;
+    const live = await r.json();
+    setApiStatus(true);
+    if(Array.isArray(live) && live.length !== ALL.length){
+      const byId = Object.fromEntries(live.map(x=>[x.id,x]));
+      ALL.forEach(d => {
+        const l = byId[d.id];
+        if(l){ d.cath = l.catholiques; d.pct = l.pourcentage_catholiques; d.cat = l.categorie||d.cat; }
+      });
+      renderMarkers(curCont);
+      toast(T().refreshed);
+    }
+  }catch(e){ /* API endormie : les données embarquées restent valides */ }
+})();
+
+/* --- init --- */
+applyLang();
+// lien partageable : index.html#d=fr-pari0 ouvre directement le rapport du diocèse
+const _h = new URLSearchParams(location.hash.slice(1));
+const _d = _h.get('d');
+if(_d && BY_ID[_d]) setTimeout(() => selectDiocese(_d), 500);
+</script>
+
+<script>
+/* --- fenêtre info : À propos / Sources / Confidentialité / Projets --- */
+function openInfo(t){
+  document.getElementById('infoOverlay').classList.add('open');
+  switchInfoTab(t || 'apropos');
+}
+function closeInfo(){
+  document.getElementById('infoOverlay').classList.remove('open');
+}
+function switchInfoTab(t){
+  document.querySelectorAll('#infoTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  document.querySelectorAll('.info-tab').forEach(d => d.style.display = (d.id === 'info-' + t) ? 'block' : 'none');
+}
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeInfo(); });
+</script>
+</body>
+</html>
