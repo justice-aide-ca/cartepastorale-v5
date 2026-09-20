@@ -877,7 +877,7 @@ const CAT_COLOR = c => ({
 /* --- carte --- */
 const map = L.map('map', {worldCopyJump:true, minZoom:2, zoomControl:false}).setView([22, 8], 2.4);
 L.control.zoom({position:'bottomright'}).addTo(map);
-const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+const osm = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   maxZoom:18, zIndex:2, attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · données : API Carta Pastorale (GCatholic)'
 }).addTo(map);
 
