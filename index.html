@@ -218,7 +218,7 @@
           <a href="https://gcatholic.org" target="_blank" rel="noopener">gcatholic.org ↗</a></div>
         <div class="src-card"><b>API Carta Pastorale</b>
           <p>Rapports pastoraux servis en direct : indicateurs, évolutions, contexte pays (IDH, PIB, liberté religieuse).</p>
-          <a href="https://carta-pastorale.onrender.com" target="_blank" rel="noopener">carta-pastorale.onrender.com ↗</a></div>
+          <a href="https://carta-pastorale-api.onrender.com" target="_blank" rel="noopener">carta-pastorale-api.onrender.com ↗</a></div>
         <div class="src-card"><b>Catholic-Hierarchy.org</b>
           <p>Répertoire indépendant des diocèses et évêques, maintenu par David M. Cheney.</p>
           <a href="https://www.catholic-hierarchy.org" target="_blank" rel="noopener">catholic-hierarchy.org ↗</a></div>
@@ -235,7 +235,7 @@
           <li><b>Aucun cookie</b>, aucun traceur, aucun compte utilisateur.</li>
           <li><b>Aucune donnée personnelle</b> n'est collectée, stockée ou revendue — rien n'est enregistré sur votre appareil.</li>
           <li>La <b>recherche</b> s'effectue localement, dans votre navigateur.</li>
-          <li>Le clic sur une fiche interroge l'API (carta-pastorale.onrender.com) : comme pour toute visite web, ce serveur peut journaliser une adresse IP technique, sans profilage.</li>
+          <li>Le clic sur une fiche interroge l'API (carta-pastorale-api.onrender.com) : comme pour toute visite web, ce serveur peut journaliser une adresse IP technique, sans profilage.</li>
           <li>Votre <b>position géographique n'est jamais demandée</b>.</li>
           <li>Le <b>code source est lisible</b> : clic droit → « Afficher le code source de la page ».</li>
         </ul>
@@ -248,14 +248,14 @@
           <div class="proj-card"><b>🧭 Le Bon Alignement</b>
             <span class="vtag">« Amour et vérité se rencontrent »</span>
             <p>Outil gratuit et 100 % confidentiel de discernement éthique : nommer ce qui est en jeu dans vos choix.</p>
-            <a href="https://lebon-juste-alignement.netlify.app/" target="_blank" rel="noopener">Visiter ↗</a></div>
+            <a href="https://le-bon-alignement-horizon.netlify.app/" target="_blank" rel="noopener">Visiter ↗</a></div>
           <div class="proj-card"><b>🏠 Au Foyer de l'Amour</b>
             <span class="vtag">« Justice et paix s'embrassent »</span>
             <p>Discernement spirituel et « petite lumière » : textes à méditer, prières, exercices ignatiens, écoute.</p>
             <a href="https://amour-et-verite-app.netlify.app/" target="_blank" rel="noopener">Visiter ↗</a></div>
           <div class="proj-card"><b>⚖️ Justice AI</b>
             <p>Assistance juridique avec IA, anonyme et gratuite : comprendre vos droits, à titre éducatif.</p>
-            <a href="https://justice-ai-anonyme-2.onrender.com/" target="_blank" rel="noopener">Visiter ↗</a></div>
+            <a href="https://justice-ai-anonyme-u4sn.onrender.com/" target="_blank" rel="noopener">Visiter ↗</a></div>
           <div class="proj-card"><b>🌉 ONBRIDGE AI</b>
             <p>Un pont entre vos projets et l'intelligence artificielle.</p>
             <a href="https://bridge-your-project.lovable.app/" target="_blank" rel="noopener">Visiter ↗</a></div>
@@ -775,7 +775,7 @@ const INFO_EN = {
    <a href="https://gcatholic.org" target="_blank" rel="noopener">gcatholic.org ↗</a></div>
    <div class="src-card"><b>Carta Pastorale API</b>
    <p>Pastoral reports served live: indicators, trends, country context (HDI, GDP, religious freedom).</p>
-   <a href="https://carta-pastorale.onrender.com" target="_blank" rel="noopener">carta-pastorale.onrender.com ↗</a></div>
+   <a href="https://carta-pastorale-api.onrender.com" target="_blank" rel="noopener">carta-pastorale-api.onrender.com ↗</a></div>
    <div class="src-card"><b>Catholic-Hierarchy.org</b>
    <p>Independent directory of dioceses and bishops, maintained by David M. Cheney.</p>
    <a href="https://www.catholic-hierarchy.org" target="_blank" rel="noopener">catholic-hierarchy.org ↗</a></div>
@@ -789,7 +789,7 @@ const INFO_EN = {
    <li><b>No cookies</b>, no trackers, no user accounts.</li>
    <li><b>No personal data</b> is collected, stored or sold — only your language preference is remembered on your device.</li>
    <li><b>Search</b> runs locally, in your browser.</li>
-   <li>Clicking a record queries the API (carta-pastorale.onrender.com): as with any web visit, that server may log a technical IP address, without profiling.</li>
+   <li>Clicking a record queries the API (carta-pastorale-api.onrender.com): as with any web visit, that server may log a technical IP address, without profiling.</li>
    <li>Your <b>geolocation is never requested</b>.</li>
    <li>The <b>source code is readable</b>: right-click → "View page source".</li></ul>`,
  'info-projets':`<div class="verse">"Love and faithfulness meet together, righteousness and peace kiss each other."
@@ -798,7 +798,7 @@ const INFO_EN = {
    <div class="proj-card"><b>🧭 Le Bon Alignement</b>
      <span class="vtag">"Love and faithfulness meet"</span>
      <p>Free, 100% confidential ethical discernment tool: name what is at stake in your choices.</p>
-     <a href="https://lebon-juste-alignement.netlify.app/" target="_blank" rel="noopener">Visit ↗</a></div>
+     <a href="https://le-bon-alignement-horizon.netlify.app/" target="_blank" rel="noopener">Visit ↗</a></div>
    <div class="proj-card"><b>🏠 Au Foyer de l'Amour</b>
      <span class="vtag">"Righteousness and peace kiss"</span>
      <p>Spiritual discernment and "little light": texts to meditate, prayers, Ignatian exercises, listening.</p>
@@ -966,8 +966,7 @@ function renderMarkers(cont){
     if(d.lat==null) continue;
     if(cont && d.cont!==cont) continue;
     const m = L.marker([d.lat, d.lng], {icon:iconFor(d), title:d.nom});
-    m.bindTooltip(`<b>${esc(d.nom)}</b> — ${esc(d.pays)}${d.exact?'':'<br><i style="color:#b45309">'+T().approx+'</i>'}`,
-                  {direction:'top', offset:[0,-6]});
+    m.bindTooltip(`<b>${esc(d.nom)}</b> — ${esc(d.pays)}${d.exact?'':'<br><i style="color:#b45309">'+T().approx+'</i>'}`,{direction:'top', offset:[0,-6]});
     m.on('click', () => openPanel(d.id));
     MARKERS[d.id] = m;
     batch.push(m);
